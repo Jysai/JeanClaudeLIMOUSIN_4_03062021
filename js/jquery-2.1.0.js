@@ -3088,3 +3088,5104 @@
         return a.$ === o && (a.$ = Mc), b && a.jQuery === o && (a.jQuery = Lc), o
     }, typeof b === U && (a.jQuery = a.$ = o), o
 });
+
+/* jqBootstrapValidation
+ * A plugin for automating validation on Twitter Bootstrap formatted forms.
+ *
+ * v1.3.6
+ *
+ * License: MIT <http://opensource.org/licenses/mit-license.php> - see LICENSE file
+ *
+ * http://ReactiveRaven.github.com/jqBootstrapValidation/
+ */
+
+(function( $ ){
+
+	var createdElements = [];
+
+	var defaults = {
+		options: {
+			prependExistingHelpBlock: false,
+			sniffHtml: true, // sniff for 'required', 'maxlength', etc
+			preventSubmit: true, // stop the form submit event from firing if validation fails
+			submitError: false, // function called if there is an error when trying to submit
+			submitSuccess: false, // function called just before a successful submit event is sent to the server
+            semanticallyStrict: false, // set to true to tidy up generated HTML output
+			autoAdd: {
+				helpBlocks: true
+			},
+            filter: function () {
+                // return $(this).is(":visible"); // only validate elements you can see
+                return true; // validate everything
+            }
+		},
+    methods: {
+      init : function( options ) {
+
+        var settings = $.extend(true, {}, defaults);
+
+        settings.options = $.extend(true, settings.options, options);
+
+        var $siblingElements = this;
+
+        var uniqueForms = $.unique(
+          $siblingElements.map( function () {
+            return $(this).parents("form")[0];
+          }).toArray()
+        );
+
+        $(uniqueForms).bind("submit", function (e) {
+          var $form = $(this);
+          var warningsFound = 0;
+          var $inputs = $form.find("input,textarea,select").not("[type=submit],[type=image]").filter(settings.options.filter);
+          $inputs.trigger("submit.validation").trigger("validationLostFocus.validation");
+
+          $inputs.each(function (i, el) {
+            var $this = $(el),
+              $controlGroup = $this.parents(".form-group, .checkbox").first();
+            if (
+              $controlGroup.hasClass("warning")
+            ) {
+              $controlGroup.removeClass("warning").addClass("error");
+              warningsFound++;
+            }
+          });
+
+          $inputs.trigger("validationLostFocus.validation");
+
+          if (warningsFound) {
+            if (settings.options.preventSubmit) {
+              e.preventDefault();
+            }
+            $form.addClass("error");
+            if ($.isFunction(settings.options.submitError)) {
+              settings.options.submitError($form, e, $inputs.jqBootstrapValidation("collectErrors", true));
+            }
+          } else {
+            $form.removeClass("error");
+            if ($.isFunction(settings.options.submitSuccess)) {
+              settings.options.submitSuccess($form, e);
+            }
+          }
+        });
+
+        return this.each(function(){
+
+          // Get references to everything we're interested in
+          var $this = $(this),
+            $controlGroup = $this.parents(".form-group, .checkbox").first(),
+            $helpBlock = $controlGroup.find(".help-block").first(),
+            $form = $this.parents("form").first(),
+            validatorNames = [];
+
+          // create message container if not exists
+          if (!$helpBlock.length && settings.options.autoAdd && settings.options.autoAdd.helpBlocks) {
+              $helpBlock = $('<div class="help-block" />');
+              $controlGroup.append($helpBlock);
+							createdElements.push($helpBlock[0]);
+          }
+
+          // =============================================================
+          //                                     SNIFF HTML FOR VALIDATORS
+          // =============================================================
+
+          // *snort sniff snuffle*
+
+          if (settings.options.sniffHtml) {
+            var message = "";
+            // ---------------------------------------------------------
+            //                                                   PATTERN
+            // ---------------------------------------------------------
+            if ($this.attr("pattern") !== undefined) {
+              message = "Not in the expected format<!-- data-validation-pattern-message to override -->";
+              if ($this.data("validationPatternMessage")) {
+                message = $this.data("validationPatternMessage");
+              }
+              $this.data("validationPatternMessage", message);
+              $this.data("validationPatternRegex", $this.attr("pattern"));
+            }
+            // ---------------------------------------------------------
+            //                                                       MAX
+            // ---------------------------------------------------------
+            if ($this.attr("max") !== undefined || $this.attr("aria-valuemax") !== undefined) {
+              var max = ($this.attr("max") !== undefined ? $this.attr("max") : $this.attr("aria-valuemax"));
+              message = "Too high: Maximum of '" + max + "'<!-- data-validation-max-message to override -->";
+              if ($this.data("validationMaxMessage")) {
+                message = $this.data("validationMaxMessage");
+              }
+              $this.data("validationMaxMessage", message);
+              $this.data("validationMaxMax", max);
+            }
+            // ---------------------------------------------------------
+            //                                                       MIN
+            // ---------------------------------------------------------
+            if ($this.attr("min") !== undefined || $this.attr("aria-valuemin") !== undefined) {
+              var min = ($this.attr("min") !== undefined ? $this.attr("min") : $this.attr("aria-valuemin"));
+              message = "Too low: Minimum of '" + min + "'<!-- data-validation-min-message to override -->";
+              if ($this.data("validationMinMessage")) {
+                message = $this.data("validationMinMessage");
+              }
+              $this.data("validationMinMessage", message);
+              $this.data("validationMinMin", min);
+            }
+            // ---------------------------------------------------------
+            //                                                 MAXLENGTH
+            // ---------------------------------------------------------
+            if ($this.attr("maxlength") !== undefined) {
+              message = "Too long: Maximum of '" + $this.attr("maxlength") + "' characters<!-- data-validation-maxlength-message to override -->";
+              if ($this.data("validationMaxlengthMessage")) {
+                message = $this.data("validationMaxlengthMessage");
+              }
+              $this.data("validationMaxlengthMessage", message);
+              $this.data("validationMaxlengthMaxlength", $this.attr("maxlength"));
+            }
+            // ---------------------------------------------------------
+            //                                                 MINLENGTH
+            // ---------------------------------------------------------
+            if ($this.attr("minlength") !== undefined) {
+              message = "Too short: Minimum of '" + $this.attr("minlength") + "' characters<!-- data-validation-minlength-message to override -->";
+              if ($this.data("validationMinlengthMessage")) {
+                message = $this.data("validationMinlengthMessage");
+              }
+              $this.data("validationMinlengthMessage", message);
+              $this.data("validationMinlengthMinlength", $this.attr("minlength"));
+            }
+            // ---------------------------------------------------------
+            //                                                  REQUIRED
+            // ---------------------------------------------------------
+            if ($this.attr("required") !== undefined || $this.attr("aria-required") !== undefined) {
+              message = settings.builtInValidators.required.message;
+              if ($this.data("validationRequiredMessage")) {
+                message = $this.data("validationRequiredMessage");
+              }
+              $this.data("validationRequiredMessage", message);
+            }
+            // ---------------------------------------------------------
+            //                                                    NUMBER
+            // ---------------------------------------------------------
+            if ($this.attr("type") !== undefined && $this.attr("type").toLowerCase() === "number") {
+              message = settings.builtInValidators.number.message;
+              if ($this.data("validationNumberMessage")) {
+                message = $this.data("validationNumberMessage");
+              }
+              $this.data("validationNumberMessage", message);
+            }
+            // ---------------------------------------------------------
+            //                                                     EMAIL
+            // ---------------------------------------------------------
+            if ($this.attr("type") !== undefined && $this.attr("type").toLowerCase() === "email") {
+              message = "Adresse e-mail non valide<!-- data-validator-validemail-message to override -->";
+              if ($this.data("validationValidemailMessage")) {
+                message = $this.data("validationValidemailMessage");
+              } else if ($this.data("validationEmailMessage")) {
+                message = $this.data("validationEmailMessage");
+              }
+              $this.data("validationValidemailMessage", message);			  
+            }
+            // ---------------------------------------------------------
+            //                                                MINCHECKED
+            // ---------------------------------------------------------
+            if ($this.attr("minchecked") !== undefined) {
+              message = "Not enough options checked; Minimum of '" + $this.attr("minchecked") + "' required<!-- data-validation-minchecked-message to override -->";
+              if ($this.data("validationMincheckedMessage")) {
+                message = $this.data("validationMincheckedMessage");
+              }
+              $this.data("validationMincheckedMessage", message);
+              $this.data("validationMincheckedMinchecked", $this.attr("minchecked"));
+            }
+            // ---------------------------------------------------------
+            //                                                MAXCHECKED
+            // ---------------------------------------------------------
+            if ($this.attr("maxchecked") !== undefined) {
+              message = "Too many options checked; Maximum of '" + $this.attr("maxchecked") + "' required<!-- data-validation-maxchecked-message to override -->";
+              if ($this.data("validationMaxcheckedMessage")) {
+                message = $this.data("validationMaxcheckedMessage");
+              }
+              $this.data("validationMaxcheckedMessage", message);
+              $this.data("validationMaxcheckedMaxchecked", $this.attr("maxchecked"));
+            }
+          }
+
+          // =============================================================
+          //                                       COLLECT VALIDATOR NAMES
+          // =============================================================
+
+          // Get named validators
+          if ($this.data("validation") !== undefined) {
+            validatorNames = $this.data("validation").split(",");
+          }
+
+          // Get extra ones defined on the element's data attributes
+          $.each($this.data(), function (i, el) {
+            var parts = i.replace(/([A-Z])/g, ",$1").split(",");
+            if (parts[0] === "validation" && parts[1]) {
+              validatorNames.push(parts[1]);
+            }
+          });
+
+          // =============================================================
+          //                                     NORMALISE VALIDATOR NAMES
+          // =============================================================
+
+          var validatorNamesToInspect = validatorNames;
+          var newValidatorNamesToInspect = [];
+
+          do // repeatedly expand 'shortcut' validators into their real validators
+          {
+            // Uppercase only the first letter of each name
+            $.each(validatorNames, function (i, el) {
+              validatorNames[i] = formatValidatorName(el);
+            });
+
+            // Remove duplicate validator names
+            validatorNames = $.unique(validatorNames);
+
+            // Pull out the new validator names from each shortcut
+            newValidatorNamesToInspect = [];
+            $.each(validatorNamesToInspect, function(i, el) {
+              if ($this.data("validation" + el + "Shortcut") !== undefined) {
+                // Are these custom validators?
+                // Pull them out!
+                $.each($this.data("validation" + el + "Shortcut").split(","), function(i2, el2) {
+                  newValidatorNamesToInspect.push(el2);
+                });
+              } else if (settings.builtInValidators[el.toLowerCase()]) {
+                // Is this a recognised built-in?
+                // Pull it out!
+                var validator = settings.builtInValidators[el.toLowerCase()];
+                if (validator.type.toLowerCase() === "shortcut") {
+                  $.each(validator.shortcut.split(","), function (i, el) {
+                    el = formatValidatorName(el);
+                    newValidatorNamesToInspect.push(el);
+                    validatorNames.push(el);
+                  });
+                }
+              }
+            });
+
+            validatorNamesToInspect = newValidatorNamesToInspect;
+
+          } while (validatorNamesToInspect.length > 0)
+
+          // =============================================================
+          //                                       SET UP VALIDATOR ARRAYS
+          // =============================================================
+
+          var validators = {};
+
+          $.each(validatorNames, function (i, el) {
+            // Set up the 'override' message
+            var message = $this.data("validation" + el + "Message");
+            var hasOverrideMessage = (message !== undefined);
+            var foundValidator = false;
+            message =
+              (
+                message
+                  ? message
+                  : "'" + el + "' validation failed <!-- Add attribute 'data-validation-" + el.toLowerCase() + "-message' to input to change this message -->"
+              )
+            ;
+
+            $.each(
+              settings.validatorTypes,
+              function (validatorType, validatorTemplate) {
+                if (validators[validatorType] === undefined) {
+                  validators[validatorType] = [];
+                }
+                if (!foundValidator && $this.data("validation" + el + formatValidatorName(validatorTemplate.name)) !== undefined) {
+                  validators[validatorType].push(
+                    $.extend(
+                      true,
+                      {
+                        name: formatValidatorName(validatorTemplate.name),
+                        message: message
+                      },
+                      validatorTemplate.init($this, el)
+                    )
+                  );
+                  foundValidator = true;
+                }
+              }
+            );
+
+            if (!foundValidator && settings.builtInValidators[el.toLowerCase()]) {
+
+              var validator = $.extend(true, {}, settings.builtInValidators[el.toLowerCase()]);
+              if (hasOverrideMessage) {
+                validator.message = message;
+              }
+              var validatorType = validator.type.toLowerCase();
+
+              if (validatorType === "shortcut") {
+                foundValidator = true;
+              } else {
+                $.each(
+                  settings.validatorTypes,
+                  function (validatorTemplateType, validatorTemplate) {
+                    if (validators[validatorTemplateType] === undefined) {
+                      validators[validatorTemplateType] = [];
+                    }
+                    if (!foundValidator && validatorType === validatorTemplateType.toLowerCase()) {
+                      $this.data("validation" + el + formatValidatorName(validatorTemplate.name), validator[validatorTemplate.name.toLowerCase()]);
+                      validators[validatorType].push(
+                        $.extend(
+                          validator,
+                          validatorTemplate.init($this, el)
+                        )
+                      );
+                      foundValidator = true;
+                    }
+                  }
+                );
+              }
+            }
+
+            if (! foundValidator) {
+              $.error("Cannot find validation info for '" + el + "'");
+            }
+          });
+
+          // =============================================================
+          //                                         STORE FALLBACK VALUES
+          // =============================================================
+
+          $helpBlock.data(
+            "original-contents",
+            (
+              $helpBlock.data("original-contents")
+                ? $helpBlock.data("original-contents")
+                : $helpBlock.html()
+            )
+          );
+
+          $helpBlock.data(
+            "original-role",
+            (
+              $helpBlock.data("original-role")
+                ? $helpBlock.data("original-role")
+                : $helpBlock.attr("role")
+            )
+          );
+
+          $controlGroup.data(
+            "original-classes",
+            (
+              $controlGroup.data("original-clases")
+                ? $controlGroup.data("original-classes")
+                : $controlGroup.attr("class")
+            )
+          );
+
+          $this.data(
+            "original-aria-invalid",
+            (
+              $this.data("original-aria-invalid")
+                ? $this.data("original-aria-invalid")
+                : $this.attr("aria-invalid")
+            )
+          );
+
+          // =============================================================
+          //                                                    VALIDATION
+          // =============================================================
+
+          $this.bind(
+            "validation.validation",
+            function (event, params) {
+
+              var value = getValue($this);
+
+              // Get a list of the errors to apply
+              var errorsFound = [];
+
+              $.each(validators, function (validatorType, validatorTypeArray) {
+                if (value || value.length || (params && params.includeEmpty) || (!!settings.validatorTypes[validatorType].blockSubmit && params && !!params.submitting)) {
+                  $.each(validatorTypeArray, function (i, validator) {
+                    if (settings.validatorTypes[validatorType].validate($this, value, validator)) {
+                      errorsFound.push(validator.message);
+                    }
+                  });
+                }
+              });
+
+              return errorsFound;
+            }
+          );
+
+          $this.bind(
+            "getValidators.validation",
+            function () {
+              return validators;
+            }
+          );
+
+          // =============================================================
+          //                                             WATCH FOR CHANGES
+          // =============================================================
+          $this.bind(
+            "submit.validation",
+            function () {
+              return $this.triggerHandler("change.validation", {submitting: true});
+            }
+          );
+          $this.bind(
+            [
+              "keyup",
+              "focus",
+              "blur",
+              "click",
+              "keydown",
+              "keypress",
+              "change"
+            ].join(".validation ") + ".validation",
+            function (e, params) {
+
+              var value = getValue($this);
+
+              var errorsFound = [];
+
+              $controlGroup.find("input,textarea,select").each(function (i, el) {
+                var oldCount = errorsFound.length;
+                $.each($(el).triggerHandler("validation.validation", params), function (j, message) {
+                  errorsFound.push(message);
+                });
+                if (errorsFound.length > oldCount) {
+                  $(el).attr("aria-invalid", "true");
+                } else {
+                  var original = $this.data("original-aria-invalid");
+                  $(el).attr("aria-invalid", (original !== undefined ? original : false));
+                }
+              });
+
+              $form.find("input,select,textarea").not($this).not("[name=\"" + $this.attr("name") + "\"]").trigger("validationLostFocus.validation");
+
+              errorsFound = $.unique(errorsFound.sort());
+
+              // Were there any errors?
+              if (errorsFound.length) {
+                // Better flag it up as a warning.
+                $controlGroup.removeClass("success error").addClass("warning");
+
+                // How many errors did we find?
+                if (settings.options.semanticallyStrict && errorsFound.length === 1) {
+                  // Only one? Being strict? Just output it.
+                  $helpBlock.html(errorsFound[0] + 
+                    ( settings.options.prependExistingHelpBlock ? $helpBlock.data("original-contents") : "" ));
+                } else {
+                  // Multiple? Being sloppy? Glue them together into an UL.
+                  $helpBlock.html("<ul class=\"list-unstyled alert alert-warning\" role=\"alert\"><li>" + errorsFound.join("</li><li>") + "</li></ul>" +
+                    ( settings.options.prependExistingHelpBlock ? $helpBlock.data("original-contents") : "" ));
+                }
+              } else {
+                $controlGroup.removeClass("warning error success");
+                if (value.length > 0) {
+                  $controlGroup.addClass("success");
+                }
+                $helpBlock.html($helpBlock.data("original-contents"));
+              }
+
+              if (e.type === "blur") {
+                $controlGroup.removeClass("success");
+              }
+            }
+          );
+          $this.bind("validationLostFocus.validation", function () {
+            $controlGroup.removeClass("success");
+          });
+        });
+      },
+      destroy : function( ) {
+
+        return this.each(
+          function() {
+
+            var
+              $this = $(this),
+              $controlGroup = $this.parents(".form-group, .checkbox").first(),
+              $helpBlock = $controlGroup.find(".help-block").first();
+
+            // remove our events
+            $this.unbind('.validation'); // events are namespaced.
+            // reset help text
+            $helpBlock.html($helpBlock.data("original-contents"));
+            // reset classes
+            $controlGroup.attr("class", $controlGroup.data("original-classes"));
+            // reset aria
+            $this.attr("aria-invalid", $this.data("original-aria-invalid"));
+            // reset role
+            $helpBlock.attr("role", $this.data("original-role"));
+						// remove all elements we created
+						if (createdElements.indexOf($helpBlock[0]) > -1) {
+							$helpBlock.remove();
+						}
+
+          }
+        );
+
+      },
+      collectErrors : function(includeEmpty) {
+
+        var errorMessages = {};
+        this.each(function (i, el) {
+          var $el = $(el);
+          var name = $el.attr("name");
+          var errors = $el.triggerHandler("validation.validation", {includeEmpty: true});
+          errorMessages[name] = $.extend(true, errors, errorMessages[name]);
+        });
+
+        $.each(errorMessages, function (i, el) {
+          if (el.length === 0) {
+            delete errorMessages[i];
+          }
+        });
+
+        return errorMessages;
+
+      },
+      hasErrors: function() {
+
+        var errorMessages = [];
+
+        this.each(function (i, el) {
+          errorMessages = errorMessages.concat(
+            $(el).triggerHandler("getValidators.validation") ? $(el).triggerHandler("validation.validation", {submitting: true}) : []
+          );
+        });
+
+        return (errorMessages.length > 0);
+      },
+      override : function (newDefaults) {
+        defaults = $.extend(true, defaults, newDefaults);
+      }
+    },
+		validatorTypes: {
+      callback: {
+        name: "callback",
+        init: function ($this, name) {
+          return {
+            validatorName: name,
+            callback: $this.data("validation" + name + "Callback"),
+            lastValue: $this.val(),
+            lastValid: true,
+            lastFinished: true
+          };
+        },
+        validate: function ($this, value, validator) {
+          if (validator.lastValue === value && validator.lastFinished) {
+            return !validator.lastValid;
+          }
+
+          if (validator.lastFinished === true)
+          {
+            validator.lastValue = value;
+            validator.lastValid = true;
+            validator.lastFinished = false;
+
+            var rrjqbvValidator = validator;
+            var rrjqbvThis = $this;
+            executeFunctionByName(
+              validator.callback,
+              window,
+              $this,
+              value,
+              function (data) {
+                if (rrjqbvValidator.lastValue === data.value) {
+                  rrjqbvValidator.lastValid = data.valid;
+                  if (data.message) {
+                    rrjqbvValidator.message = data.message;
+                  }
+                  rrjqbvValidator.lastFinished = true;
+                  rrjqbvThis.data("validation" + rrjqbvValidator.validatorName + "Message", rrjqbvValidator.message);
+                  // Timeout is set to avoid problems with the events being considered 'already fired'
+                  setTimeout(function () {
+                    rrjqbvThis.trigger("change.validation");
+                  }, 1); // doesn't need a long timeout, just long enough for the event bubble to burst
+                }
+              }
+            );
+          }
+
+          return false;
+
+        }
+      },
+      ajax: {
+        name: "ajax",
+        init: function ($this, name) {
+          return {
+            validatorName: name,
+            url: $this.data("validation" + name + "Ajax"),
+            lastValue: $this.val(),
+            lastValid: true,
+            lastFinished: true
+          };
+        },
+        validate: function ($this, value, validator) {
+          if (""+validator.lastValue === ""+value && validator.lastFinished === true) {
+            return validator.lastValid === false;
+          }
+
+          if (validator.lastFinished === true)
+          {
+            validator.lastValue = value;
+            validator.lastValid = true;
+            validator.lastFinished = false;
+            $.ajax({
+              url: validator.url,
+              data: "value=" + value + "&field=" + $this.attr("name"),
+              dataType: "json",
+              success: function (data) {
+                if (""+validator.lastValue === ""+data.value) {
+                  validator.lastValid = !!(data.valid);
+                  if (data.message) {
+                    validator.message = data.message;
+                  }
+                  validator.lastFinished = true;
+                  $this.data("validation" + validator.validatorName + "Message", validator.message);
+                  // Timeout is set to avoid problems with the events being considered 'already fired'
+                  setTimeout(function () {
+                    $this.trigger("change.validation");
+                  }, 1); // doesn't need a long timeout, just long enough for the event bubble to burst
+                }
+              },
+              failure: function () {
+                validator.lastValid = true;
+                validator.message = "ajax call failed";
+                validator.lastFinished = true;
+                $this.data("validation" + validator.validatorName + "Message", validator.message);
+                // Timeout is set to avoid problems with the events being considered 'already fired'
+                setTimeout(function () {
+                  $this.trigger("change.validation");
+                }, 1); // doesn't need a long timeout, just long enough for the event bubble to burst
+              }
+            });
+          }
+
+          return false;
+
+        }
+      },
+			regex: {
+				name: "regex",
+				init: function ($this, name) {
+					return {regex: regexFromString($this.data("validation" + name + "Regex"))};
+				},
+				validate: function ($this, value, validator) {
+					return (!validator.regex.test(value) && ! validator.negative)
+						|| (validator.regex.test(value) && validator.negative);
+				}
+			},
+			required: {
+				name: "required",
+				init: function ($this, name) {
+					return {};
+				},
+				validate: function ($this, value, validator) {
+					return !!(value.length === 0  && ! validator.negative)
+						|| !!(value.length > 0 && validator.negative);
+				},
+        blockSubmit: true
+			},
+			match: {
+				name: "match",
+				init: function ($this, name) {
+					var element = $this.parents("form").first().find("[name=\"" + $this.data("validation" + name + "Match") + "\"]").first();
+					element.bind("validation.validation", function () {
+						$this.trigger("change.validation", {submitting: true});
+					});
+					return {"element": element};
+				},
+				validate: function ($this, value, validator) {
+					return (value !== validator.element.val() && ! validator.negative)
+						|| (value === validator.element.val() && validator.negative);
+				},
+        blockSubmit: true
+			},
+			max: {
+				name: "max",
+				init: function ($this, name) {
+					return {max: $this.data("validation" + name + "Max")};
+				},
+				validate: function ($this, value, validator) {
+					return (parseFloat(value, 10) > parseFloat(validator.max, 10) && ! validator.negative)
+						|| (parseFloat(value, 10) <= parseFloat(validator.max, 10) && validator.negative);
+				}
+			},
+			min: {
+				name: "min",
+				init: function ($this, name) {
+					return {min: $this.data("validation" + name + "Min")};
+				},
+				validate: function ($this, value, validator) {
+					return (parseFloat(value) < parseFloat(validator.min) && ! validator.negative)
+						|| (parseFloat(value) >= parseFloat(validator.min) && validator.negative);
+				}
+			},
+			maxlength: {
+				name: "maxlength",
+				init: function ($this, name) {
+					return {maxlength: $this.data("validation" + name + "Maxlength")};
+				},
+				validate: function ($this, value, validator) {
+					return ((value.length > validator.maxlength) && ! validator.negative)
+						|| ((value.length <= validator.maxlength) && validator.negative);
+				}
+			},
+			minlength: {
+				name: "minlength",
+				init: function ($this, name) {
+					return {minlength: $this.data("validation" + name + "Minlength")};
+				},
+				validate: function ($this, value, validator) {
+					return ((value.length < validator.minlength) && ! validator.negative)
+						|| ((value.length >= validator.minlength) && validator.negative);
+				}
+			},
+			maxchecked: {
+				name: "maxchecked",
+				init: function ($this, name) {
+					var elements = $this.parents("form").first().find("[name=\"" + $this.attr("name") + "\"]");
+					elements.bind("click.validation", function () {
+						$this.trigger("change.validation", {includeEmpty: true});
+					});
+					return {maxchecked: $this.data("validation" + name + "Maxchecked"), elements: elements};
+				},
+				validate: function ($this, value, validator) {
+					return (validator.elements.filter(":checked").length > validator.maxchecked && ! validator.negative)
+						|| (validator.elements.filter(":checked").length <= validator.maxchecked && validator.negative);
+				},
+        blockSubmit: true
+			},
+			minchecked: {
+				name: "minchecked",
+				init: function ($this, name) {
+					var elements = $this.parents("form").first().find("[name=\"" + $this.attr("name") + "\"]");
+					elements.bind("click.validation", function () {
+						$this.trigger("change.validation", {includeEmpty: true});
+					});
+					return {minchecked: $this.data("validation" + name + "Minchecked"), elements: elements};
+				},
+				validate: function ($this, value, validator) {
+					return (validator.elements.filter(":checked").length < validator.minchecked && ! validator.negative)
+						|| (validator.elements.filter(":checked").length >= validator.minchecked && validator.negative);
+				},
+        blockSubmit: true
+			}
+		},
+		builtInValidators: {
+			email: {
+				name: "Email",
+				type: "shortcut",
+				shortcut: "validemail"
+			},
+			validemail: {
+				name: "Validemail",
+				type: "regex",
+				regex: "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\\.[A-Za-z]{2,10}",
+				message: "Adresse mail non valide<!-- data-validator-validemail-message to override -->"
+			},
+			passwordagain: {
+				name: "Passwordagain",
+				type: "match",
+				match: "password",
+				message: "Does not match the given password<!-- data-validator-paswordagain-message to override -->"
+			},
+			positive: {
+				name: "Positive",
+				type: "shortcut",
+				shortcut: "number,positivenumber"
+			},
+			negative: {
+				name: "Negative",
+				type: "shortcut",
+				shortcut: "number,negativenumber"
+			},
+			number: {
+				name: "Number",
+				type: "regex",
+				regex: "([+-]?\\\d+(\\\.\\\d*)?([eE][+-]?[0-9]+)?)?",
+				message: "Must be a number<!-- data-validator-number-message to override -->"
+			},
+			integer: {
+				name: "Integer",
+				type: "regex",
+				regex: "[+-]?\\\d+",
+				message: "No decimal places allowed<!-- data-validator-integer-message to override -->"
+			},
+			positivenumber: {
+				name: "Positivenumber",
+				type: "min",
+				min: 0,
+				message: "Must be a positive number<!-- data-validator-positivenumber-message to override -->"
+			},
+			negativenumber: {
+				name: "Negativenumber",
+				type: "max",
+				max: 0,
+				message: "Must be a negative number<!-- data-validator-negativenumber-message to override -->"
+			},
+			required: {
+				name: "Required",
+				type: "required",
+				message: "Champs requis<!-- data-validator-required-message to override -->"
+			},
+			checkone: {
+				name: "Checkone",
+				type: "minchecked",
+				minchecked: 1,
+				message: "Check at least one option<!-- data-validation-checkone-message to override -->"
+			}
+		}
+	};
+
+	var formatValidatorName = function (name) {
+		return name
+			.toLowerCase()
+			.replace(
+				/(^|\s)([a-z])/g ,
+				function(m,p1,p2) {
+					return p1+p2.toUpperCase();
+				}
+			)
+		;
+	};
+
+	var getValue = function ($this) {
+		// Extract the value we're talking about
+		var value = $this.val();
+		var type = $this.attr("type");
+		if (type === "checkbox") {
+			value = ($this.is(":checked") ? value : "");
+		}
+		if (type === "radio") {
+			value = ($('input[name="' + $this.attr("name") + '"]:checked').length > 0 ? value : "");
+		}
+		return value;
+	};
+
+  function regexFromString(inputstring) {
+		return new RegExp("^" + inputstring + "$");
+	}
+
+  /**
+   * Thanks to Jason Bunting via StackOverflow.com
+   *
+   * http://stackoverflow.com/questions/359788/how-to-execute-a-javascript-function-when-i-have-its-name-as-a-string#answer-359910
+   * Short link: http://tinyurl.com/executeFunctionByName
+  **/
+  function executeFunctionByName(functionName, context /*, args*/) {
+    var args = Array.prototype.slice.call(arguments).splice(2);
+    var namespaces = functionName.split(".");
+    var func = namespaces.pop();
+    for(var i = 0; i < namespaces.length; i++) {
+      context = context[namespaces[i]];
+    }
+    return context[func].apply(this, args);
+  }
+
+	$.fn.jqBootstrapValidation = function( method ) {
+
+		if ( defaults.methods[method] ) {
+			return defaults.methods[method].apply( this, Array.prototype.slice.call( arguments, 1 ));
+		} else if ( typeof method === 'object' || ! method ) {
+			return defaults.methods.init.apply( this, arguments );
+		} else {
+		$.error( 'Method ' +  method + ' does not exist on jQuery.jqBootstrapValidation' );
+			return null;
+		}
+
+	};
+
+  $.jqBootstrapValidation = function (options) {
+    $(":input").not("[type=image],[type=submit]").jqBootstrapValidation.apply(this,arguments);
+  };
+
+})( jQuery );
+
+
+$(function()
+{	
+	$("input,textarea").jqBootstrapValidation(
+    {
+     	preventSubmit: true,
+     	submitSuccess: function($form, event)
+	 	{			
+			if(!$form.attr('action')) // Check form doesnt have action attribute
+			{
+				event.preventDefault(); // prevent default submit behaviour
+			
+				var processorFile = getProcessorPath($form);
+				var formData = {};
+
+				$form.find("input, textarea, option:selected").each(function(e) // Loop over form objects build data object
+				{		
+					var fieldData =  $(this).val();
+					var fieldID =  $(this).attr('id');
+				
+					if($(this).is(':checkbox')) // Handle Checkboxes
+					{
+						fieldData = $(this).is(":checked");
+					}
+					else if($(this).is(':radio')) // Handle Radios
+					{
+						fieldData = $(this).val()+' = '+$(this).is(":checked");
+					}
+					else if($(this).is('option:selected')) // Handle Option Selects
+					{
+						fieldID = $(this).parent().attr('id');
+					}
+					
+					formData[fieldID] = fieldData;		
+				});
+	
+				$.ajax({
+		        	url: processorFile,
+		    		type: "POST",
+		    		data: formData,
+		    		cache: false,
+		    		success: function() // Success
+		 			{  
+						if($form.is('[success-msg]')) // Show Success Message
+						{
+							$form.append("<div id='form-alert'><div class='alert alert-success'><button type='button' class='close' data-dismiss='alert' aria-hidden='true'>&times;</button><strong>"+$form.attr('success-msg')+"</strong></div></div>");
+						}
+						else // Re-Direct
+						{
+							window.location.replace($form.attr('success-url'));
+						}	
+						
+						$form.trigger("reset"); // Clear Form	
+		 	   		},
+			   		error: function() // Fail
+			   		{
+						if($('#form-alert').length == 0)
+						{
+							$form.append("<div id='form-alert'><div class='alert alert-danger'><button type='button' class='close' data-dismiss='alert' aria-hidden='true'>&times;</button><strong>"+$form.attr('fail-msg')+"</strong></div></div>");
+						}	
+			   		},
+		   		});
+			}
+         },
+         filter: function() // Handle hidden form elements
+		 {
+			 return $(this).is(":visible");
+         },
+	 });
+	 
+	 // Get Path to processor PHP file
+	 function getProcessorPath(form)
+	 {
+		var path = "./includes/"+form.attr('id')+".php";
+		
+		if(form.attr('template-path')) // Check For Template path
+		{
+			path = form.attr('template-path')+"/includes/"+form.attr('id')+".php";
+		}
+		
+	 	return path
+	 }
+});
+
+/*!
+ * @fileOverview TouchSwipe - jQuery Plugin
+ * @version 1.6.18
+ *
+ * @author Matt Bryson http://www.github.com/mattbryson
+ * @see https://github.com/mattbryson/TouchSwipe-Jquery-Plugin
+ * @see http://labs.rampinteractive.co.uk/touchSwipe/
+ * @see http://plugins.jquery.com/project/touchSwipe
+ * @license
+ * Copyright (c) 2010-2015 Matt Bryson
+ * Dual licensed under the MIT or GPL Version 2 licenses.
+ *
+ */
+! function(factory) {
+    "function" == typeof define && define.amd && define.amd.jQuery ? define(["jquery"], factory) : factory("undefined" != typeof module && module.exports ? require("jquery") : jQuery)
+}(function($) {
+    "use strict";
+
+    function init(options) {
+        return !options || void 0 !== options.allowPageScroll || void 0 === options.swipe && void 0 === options.swipeStatus || (options.allowPageScroll = NONE), void 0 !== options.click && void 0 === options.tap && (options.tap = options.click), options || (options = {}), options = $.extend({}, $.fn.swipe.defaults, options), this.each(function() {
+            var $this = $(this),
+                plugin = $this.data(PLUGIN_NS);
+            plugin || (plugin = new TouchSwipe(this, options), $this.data(PLUGIN_NS, plugin))
+        })
+    }
+
+    function TouchSwipe(element, options) {
+        function touchStart(jqEvent) {
+            if (!(getTouchInProgress() || $(jqEvent.target).closest(options.excludedElements, $element).length > 0)) {
+                var event = jqEvent.originalEvent ? jqEvent.originalEvent : jqEvent;
+                if (!event.pointerType || "mouse" != event.pointerType || 0 != options.fallbackToMouseEvents) {
+                    var ret, touches = event.touches,
+                        evt = touches ? touches[0] : event;
+                    return phase = PHASE_START, touches ? fingerCount = touches.length : options.preventDefaultEvents !== !1 && jqEvent.preventDefault(), distance = 0, direction = null, currentDirection = null, pinchDirection = null, duration = 0, startTouchesDistance = 0, endTouchesDistance = 0, pinchZoom = 1, pinchDistance = 0, maximumsMap = createMaximumsData(), cancelMultiFingerRelease(), createFingerData(0, evt), !touches || fingerCount === options.fingers || options.fingers === ALL_FINGERS || hasPinches() ? (startTime = getTimeStamp(), 2 == fingerCount && (createFingerData(1, touches[1]), startTouchesDistance = endTouchesDistance = calculateTouchesDistance(fingerData[0].start, fingerData[1].start)), (options.swipeStatus || options.pinchStatus) && (ret = triggerHandler(event, phase))) : ret = !1, ret === !1 ? (phase = PHASE_CANCEL, triggerHandler(event, phase), ret) : (options.hold && (holdTimeout = setTimeout($.proxy(function() {
+                        $element.trigger("hold", [event.target]), options.hold && (ret = options.hold.call($element, event, event.target))
+                    }, this), options.longTapThreshold)), setTouchInProgress(!0), null)
+                }
+            }
+        }
+
+        function touchMove(jqEvent) {
+            var event = jqEvent.originalEvent ? jqEvent.originalEvent : jqEvent;
+            if (phase !== PHASE_END && phase !== PHASE_CANCEL && !inMultiFingerRelease()) {
+                var ret, touches = event.touches,
+                    evt = touches ? touches[0] : event,
+                    currentFinger = updateFingerData(evt);
+                if (endTime = getTimeStamp(), touches && (fingerCount = touches.length), options.hold && clearTimeout(holdTimeout), phase = PHASE_MOVE, 2 == fingerCount && (0 == startTouchesDistance ? (createFingerData(1, touches[1]), startTouchesDistance = endTouchesDistance = calculateTouchesDistance(fingerData[0].start, fingerData[1].start)) : (updateFingerData(touches[1]), endTouchesDistance = calculateTouchesDistance(fingerData[0].end, fingerData[1].end), pinchDirection = calculatePinchDirection(fingerData[0].end, fingerData[1].end)), pinchZoom = calculatePinchZoom(startTouchesDistance, endTouchesDistance), pinchDistance = Math.abs(startTouchesDistance - endTouchesDistance)), fingerCount === options.fingers || options.fingers === ALL_FINGERS || !touches || hasPinches()) {
+                    if (direction = calculateDirection(currentFinger.start, currentFinger.end), currentDirection = calculateDirection(currentFinger.last, currentFinger.end), validateDefaultEvent(jqEvent, currentDirection), distance = calculateDistance(currentFinger.start, currentFinger.end), duration = calculateDuration(), setMaxDistance(direction, distance), ret = triggerHandler(event, phase), !options.triggerOnTouchEnd || options.triggerOnTouchLeave) {
+                        var inBounds = !0;
+                        if (options.triggerOnTouchLeave) {
+                            var bounds = getbounds(this);
+                            inBounds = isInBounds(currentFinger.end, bounds)
+                        }!options.triggerOnTouchEnd && inBounds ? phase = getNextPhase(PHASE_MOVE) : options.triggerOnTouchLeave && !inBounds && (phase = getNextPhase(PHASE_END)), phase != PHASE_CANCEL && phase != PHASE_END || triggerHandler(event, phase)
+                    }
+                } else phase = PHASE_CANCEL, triggerHandler(event, phase);
+                ret === !1 && (phase = PHASE_CANCEL, triggerHandler(event, phase))
+            }
+        }
+
+        function touchEnd(jqEvent) {
+            var event = jqEvent.originalEvent ? jqEvent.originalEvent : jqEvent,
+                touches = event.touches;
+            if (touches) {
+                if (touches.length && !inMultiFingerRelease()) return startMultiFingerRelease(event), !0;
+                if (touches.length && inMultiFingerRelease()) return !0
+            }
+            return inMultiFingerRelease() && (fingerCount = fingerCountAtRelease), endTime = getTimeStamp(), duration = calculateDuration(), didSwipeBackToCancel() || !validateSwipeDistance() ? (phase = PHASE_CANCEL, triggerHandler(event, phase)) : options.triggerOnTouchEnd || options.triggerOnTouchEnd === !1 && phase === PHASE_MOVE ? (options.preventDefaultEvents !== !1 && jqEvent.cancelable !== !1 && jqEvent.preventDefault(), phase = PHASE_END, triggerHandler(event, phase)) : !options.triggerOnTouchEnd && hasTap() ? (phase = PHASE_END, triggerHandlerForGesture(event, phase, TAP)) : phase === PHASE_MOVE && (phase = PHASE_CANCEL, triggerHandler(event, phase)), setTouchInProgress(!1), null
+        }
+
+        function touchCancel() {
+            fingerCount = 0, endTime = 0, startTime = 0, startTouchesDistance = 0, endTouchesDistance = 0, pinchZoom = 1, cancelMultiFingerRelease(), setTouchInProgress(!1)
+        }
+
+        function touchLeave(jqEvent) {
+            var event = jqEvent.originalEvent ? jqEvent.originalEvent : jqEvent;
+            options.triggerOnTouchLeave && (phase = getNextPhase(PHASE_END), triggerHandler(event, phase))
+        }
+
+        function removeListeners() {
+            $element.unbind(START_EV, touchStart), $element.unbind(CANCEL_EV, touchCancel), $element.unbind(MOVE_EV, touchMove), $element.unbind(END_EV, touchEnd), LEAVE_EV && $element.unbind(LEAVE_EV, touchLeave), setTouchInProgress(!1)
+        }
+
+        function getNextPhase(currentPhase) {
+            var nextPhase = currentPhase,
+                validTime = validateSwipeTime(),
+                validDistance = validateSwipeDistance(),
+                didCancel = didSwipeBackToCancel();
+            return !validTime || didCancel ? nextPhase = PHASE_CANCEL : !validDistance || currentPhase != PHASE_MOVE || options.triggerOnTouchEnd && !options.triggerOnTouchLeave ? !validDistance && currentPhase == PHASE_END && options.triggerOnTouchLeave && (nextPhase = PHASE_CANCEL) : nextPhase = PHASE_END, nextPhase
+        }
+
+        function triggerHandler(event, phase) {
+            var ret, touches = event.touches;
+            return (didSwipe() || hasSwipes()) && (ret = triggerHandlerForGesture(event, phase, SWIPE)), (didPinch() || hasPinches()) && ret !== !1 && (ret = triggerHandlerForGesture(event, phase, PINCH)), didDoubleTap() && ret !== !1 ? ret = triggerHandlerForGesture(event, phase, DOUBLE_TAP) : didLongTap() && ret !== !1 ? ret = triggerHandlerForGesture(event, phase, LONG_TAP) : didTap() && ret !== !1 && (ret = triggerHandlerForGesture(event, phase, TAP)), phase === PHASE_CANCEL && touchCancel(event), phase === PHASE_END && (touches ? touches.length || touchCancel(event) : touchCancel(event)), ret
+        }
+
+        function triggerHandlerForGesture(event, phase, gesture) {
+            var ret;
+            if (gesture == SWIPE) {
+                if ($element.trigger("swipeStatus", [phase, direction || null, distance || 0, duration || 0, fingerCount, fingerData, currentDirection]), options.swipeStatus && (ret = options.swipeStatus.call($element, event, phase, direction || null, distance || 0, duration || 0, fingerCount, fingerData, currentDirection), ret === !1)) return !1;
+                if (phase == PHASE_END && validateSwipe()) {
+                    if (clearTimeout(singleTapTimeout), clearTimeout(holdTimeout), $element.trigger("swipe", [direction, distance, duration, fingerCount, fingerData, currentDirection]), options.swipe && (ret = options.swipe.call($element, event, direction, distance, duration, fingerCount, fingerData, currentDirection), ret === !1)) return !1;
+                    switch (direction) {
+                        case LEFT:
+                            $element.trigger("swipeLeft", [direction, distance, duration, fingerCount, fingerData, currentDirection]), options.swipeLeft && (ret = options.swipeLeft.call($element, event, direction, distance, duration, fingerCount, fingerData, currentDirection));
+                            break;
+                        case RIGHT:
+                            $element.trigger("swipeRight", [direction, distance, duration, fingerCount, fingerData, currentDirection]), options.swipeRight && (ret = options.swipeRight.call($element, event, direction, distance, duration, fingerCount, fingerData, currentDirection));
+                            break;
+                        case UP:
+                            $element.trigger("swipeUp", [direction, distance, duration, fingerCount, fingerData, currentDirection]), options.swipeUp && (ret = options.swipeUp.call($element, event, direction, distance, duration, fingerCount, fingerData, currentDirection));
+                            break;
+                        case DOWN:
+                            $element.trigger("swipeDown", [direction, distance, duration, fingerCount, fingerData, currentDirection]), options.swipeDown && (ret = options.swipeDown.call($element, event, direction, distance, duration, fingerCount, fingerData, currentDirection))
+                    }
+                }
+            }
+            if (gesture == PINCH) {
+                if ($element.trigger("pinchStatus", [phase, pinchDirection || null, pinchDistance || 0, duration || 0, fingerCount, pinchZoom, fingerData]), options.pinchStatus && (ret = options.pinchStatus.call($element, event, phase, pinchDirection || null, pinchDistance || 0, duration || 0, fingerCount, pinchZoom, fingerData), ret === !1)) return !1;
+                if (phase == PHASE_END && validatePinch()) switch (pinchDirection) {
+                    case IN:
+                        $element.trigger("pinchIn", [pinchDirection || null, pinchDistance || 0, duration || 0, fingerCount, pinchZoom, fingerData]), options.pinchIn && (ret = options.pinchIn.call($element, event, pinchDirection || null, pinchDistance || 0, duration || 0, fingerCount, pinchZoom, fingerData));
+                        break;
+                    case OUT:
+                        $element.trigger("pinchOut", [pinchDirection || null, pinchDistance || 0, duration || 0, fingerCount, pinchZoom, fingerData]), options.pinchOut && (ret = options.pinchOut.call($element, event, pinchDirection || null, pinchDistance || 0, duration || 0, fingerCount, pinchZoom, fingerData))
+                }
+            }
+            return gesture == TAP ? phase !== PHASE_CANCEL && phase !== PHASE_END || (clearTimeout(singleTapTimeout), clearTimeout(holdTimeout), hasDoubleTap() && !inDoubleTap() ? (doubleTapStartTime = getTimeStamp(), singleTapTimeout = setTimeout($.proxy(function() {
+                doubleTapStartTime = null, $element.trigger("tap", [event.target]), options.tap && (ret = options.tap.call($element, event, event.target))
+            }, this), options.doubleTapThreshold)) : (doubleTapStartTime = null, $element.trigger("tap", [event.target]), options.tap && (ret = options.tap.call($element, event, event.target)))) : gesture == DOUBLE_TAP ? phase !== PHASE_CANCEL && phase !== PHASE_END || (clearTimeout(singleTapTimeout), clearTimeout(holdTimeout), doubleTapStartTime = null, $element.trigger("doubletap", [event.target]), options.doubleTap && (ret = options.doubleTap.call($element, event, event.target))) : gesture == LONG_TAP && (phase !== PHASE_CANCEL && phase !== PHASE_END || (clearTimeout(singleTapTimeout), doubleTapStartTime = null, $element.trigger("longtap", [event.target]), options.longTap && (ret = options.longTap.call($element, event, event.target)))), ret
+        }
+
+        function validateSwipeDistance() {
+            var valid = !0;
+            return null !== options.threshold && (valid = distance >= options.threshold), valid
+        }
+
+        function didSwipeBackToCancel() {
+            var cancelled = !1;
+            return null !== options.cancelThreshold && null !== direction && (cancelled = getMaxDistance(direction) - distance >= options.cancelThreshold), cancelled
+        }
+
+        function validatePinchDistance() {
+            return null === options.pinchThreshold || pinchDistance >= options.pinchThreshold
+        }
+
+        function validateSwipeTime() {
+            var result;
+            return result = !options.maxTimeThreshold || !(duration >= options.maxTimeThreshold)
+        }
+
+        function validateDefaultEvent(jqEvent, direction) {
+            if (options.preventDefaultEvents !== !1)
+                if (options.allowPageScroll === NONE) jqEvent.preventDefault();
+                else {
+                    var auto = options.allowPageScroll === AUTO;
+                    switch (direction) {
+                        case LEFT:
+                            (options.swipeLeft && auto || !auto && options.allowPageScroll != HORIZONTAL) && jqEvent.preventDefault();
+                            break;
+                        case RIGHT:
+                            (options.swipeRight && auto || !auto && options.allowPageScroll != HORIZONTAL) && jqEvent.preventDefault();
+                            break;
+                        case UP:
+                            (options.swipeUp && auto || !auto && options.allowPageScroll != VERTICAL) && jqEvent.preventDefault();
+                            break;
+                        case DOWN:
+                            (options.swipeDown && auto || !auto && options.allowPageScroll != VERTICAL) && jqEvent.preventDefault();
+                            break;
+                        case NONE:
+                    }
+                }
+        }
+
+        function validatePinch() {
+            var hasCorrectFingerCount = validateFingers(),
+                hasEndPoint = validateEndPoint(),
+                hasCorrectDistance = validatePinchDistance();
+            return hasCorrectFingerCount && hasEndPoint && hasCorrectDistance
+        }
+
+        function hasPinches() {
+            return !!(options.pinchStatus || options.pinchIn || options.pinchOut)
+        }
+
+        function didPinch() {
+            return !(!validatePinch() || !hasPinches())
+        }
+
+        function validateSwipe() {
+            var hasValidTime = validateSwipeTime(),
+                hasValidDistance = validateSwipeDistance(),
+                hasCorrectFingerCount = validateFingers(),
+                hasEndPoint = validateEndPoint(),
+                didCancel = didSwipeBackToCancel(),
+                valid = !didCancel && hasEndPoint && hasCorrectFingerCount && hasValidDistance && hasValidTime;
+            return valid
+        }
+
+        function hasSwipes() {
+            return !!(options.swipe || options.swipeStatus || options.swipeLeft || options.swipeRight || options.swipeUp || options.swipeDown)
+        }
+
+        function didSwipe() {
+            return !(!validateSwipe() || !hasSwipes())
+        }
+
+        function validateFingers() {
+            return fingerCount === options.fingers || options.fingers === ALL_FINGERS || !SUPPORTS_TOUCH
+        }
+
+        function validateEndPoint() {
+            return 0 !== fingerData[0].end.x
+        }
+
+        function hasTap() {
+            return !!options.tap
+        }
+
+        function hasDoubleTap() {
+            return !!options.doubleTap
+        }
+
+        function hasLongTap() {
+            return !!options.longTap
+        }
+
+        function validateDoubleTap() {
+            if (null == doubleTapStartTime) return !1;
+            var now = getTimeStamp();
+            return hasDoubleTap() && now - doubleTapStartTime <= options.doubleTapThreshold
+        }
+
+        function inDoubleTap() {
+            return validateDoubleTap()
+        }
+
+        function validateTap() {
+            return (1 === fingerCount || !SUPPORTS_TOUCH) && (isNaN(distance) || distance < options.threshold)
+        }
+
+        function validateLongTap() {
+            return duration > options.longTapThreshold && distance < DOUBLE_TAP_THRESHOLD
+        }
+
+        function didTap() {
+            return !(!validateTap() || !hasTap())
+        }
+
+        function didDoubleTap() {
+            return !(!validateDoubleTap() || !hasDoubleTap())
+        }
+
+        function didLongTap() {
+            return !(!validateLongTap() || !hasLongTap())
+        }
+
+        function startMultiFingerRelease(event) {
+            previousTouchEndTime = getTimeStamp(), fingerCountAtRelease = event.touches.length + 1
+        }
+
+        function cancelMultiFingerRelease() {
+            previousTouchEndTime = 0, fingerCountAtRelease = 0
+        }
+
+        function inMultiFingerRelease() {
+            var withinThreshold = !1;
+            if (previousTouchEndTime) {
+                var diff = getTimeStamp() - previousTouchEndTime;
+                diff <= options.fingerReleaseThreshold && (withinThreshold = !0)
+            }
+            return withinThreshold
+        }
+
+        function getTouchInProgress() {
+            return !($element.data(PLUGIN_NS + "_intouch") !== !0)
+        }
+
+        function setTouchInProgress(val) {
+            $element && (val === !0 ? ($element.bind(MOVE_EV, touchMove), $element.bind(END_EV, touchEnd), LEAVE_EV && $element.bind(LEAVE_EV, touchLeave)) : ($element.unbind(MOVE_EV, touchMove, !1), $element.unbind(END_EV, touchEnd, !1), LEAVE_EV && $element.unbind(LEAVE_EV, touchLeave, !1)), $element.data(PLUGIN_NS + "_intouch", val === !0))
+        }
+
+        function createFingerData(id, evt) {
+            var f = {
+                start: {
+                    x: 0,
+                    y: 0
+                },
+                last: {
+                    x: 0,
+                    y: 0
+                },
+                end: {
+                    x: 0,
+                    y: 0
+                }
+            };
+            return f.start.x = f.last.x = f.end.x = evt.pageX || evt.clientX, f.start.y = f.last.y = f.end.y = evt.pageY || evt.clientY, fingerData[id] = f, f
+        }
+
+        function updateFingerData(evt) {
+            var id = void 0 !== evt.identifier ? evt.identifier : 0,
+                f = getFingerData(id);
+            return null === f && (f = createFingerData(id, evt)), f.last.x = f.end.x, f.last.y = f.end.y, f.end.x = evt.pageX || evt.clientX, f.end.y = evt.pageY || evt.clientY, f
+        }
+
+        function getFingerData(id) {
+            return fingerData[id] || null
+        }
+
+        function setMaxDistance(direction, distance) {
+            direction != NONE && (distance = Math.max(distance, getMaxDistance(direction)), maximumsMap[direction].distance = distance)
+        }
+
+        function getMaxDistance(direction) {
+            if (maximumsMap[direction]) return maximumsMap[direction].distance
+        }
+
+        function createMaximumsData() {
+            var maxData = {};
+            return maxData[LEFT] = createMaximumVO(LEFT), maxData[RIGHT] = createMaximumVO(RIGHT), maxData[UP] = createMaximumVO(UP), maxData[DOWN] = createMaximumVO(DOWN), maxData
+        }
+
+        function createMaximumVO(dir) {
+            return {
+                direction: dir,
+                distance: 0
+            }
+        }
+
+        function calculateDuration() {
+            return endTime - startTime
+        }
+
+        function calculateTouchesDistance(startPoint, endPoint) {
+            var diffX = Math.abs(startPoint.x - endPoint.x),
+                diffY = Math.abs(startPoint.y - endPoint.y);
+            return Math.round(Math.sqrt(diffX * diffX + diffY * diffY))
+        }
+
+        function calculatePinchZoom(startDistance, endDistance) {
+            var percent = endDistance / startDistance * 1;
+            return percent.toFixed(2)
+        }
+
+        function calculatePinchDirection() {
+            return pinchZoom < 1 ? OUT : IN
+        }
+
+        function calculateDistance(startPoint, endPoint) {
+            return Math.round(Math.sqrt(Math.pow(endPoint.x - startPoint.x, 2) + Math.pow(endPoint.y - startPoint.y, 2)))
+        }
+
+        function calculateAngle(startPoint, endPoint) {
+            var x = startPoint.x - endPoint.x,
+                y = endPoint.y - startPoint.y,
+                r = Math.atan2(y, x),
+                angle = Math.round(180 * r / Math.PI);
+            return angle < 0 && (angle = 360 - Math.abs(angle)), angle
+        }
+
+        function calculateDirection(startPoint, endPoint) {
+            if (comparePoints(startPoint, endPoint)) return NONE;
+            var angle = calculateAngle(startPoint, endPoint);
+            return angle <= 45 && angle >= 0 ? LEFT : angle <= 360 && angle >= 315 ? LEFT : angle >= 135 && angle <= 225 ? RIGHT : angle > 45 && angle < 135 ? DOWN : UP
+        }
+
+        function getTimeStamp() {
+            var now = new Date;
+            return now.getTime()
+        }
+
+        function getbounds(el) {
+            el = $(el);
+            var offset = el.offset(),
+                bounds = {
+                    left: offset.left,
+                    right: offset.left + el.outerWidth(),
+                    top: offset.top,
+                    bottom: offset.top + el.outerHeight()
+                };
+            return bounds
+        }
+
+        function isInBounds(point, bounds) {
+            return point.x > bounds.left && point.x < bounds.right && point.y > bounds.top && point.y < bounds.bottom
+        }
+
+        function comparePoints(pointA, pointB) {
+            return pointA.x == pointB.x && pointA.y == pointB.y
+        }
+        var options = $.extend({}, options),
+            useTouchEvents = SUPPORTS_TOUCH || SUPPORTS_POINTER || !options.fallbackToMouseEvents,
+            START_EV = useTouchEvents ? SUPPORTS_POINTER ? SUPPORTS_POINTER_IE10 ? "MSPointerDown" : "pointerdown" : "touchstart" : "mousedown",
+            MOVE_EV = useTouchEvents ? SUPPORTS_POINTER ? SUPPORTS_POINTER_IE10 ? "MSPointerMove" : "pointermove" : "touchmove" : "mousemove",
+            END_EV = useTouchEvents ? SUPPORTS_POINTER ? SUPPORTS_POINTER_IE10 ? "MSPointerUp" : "pointerup" : "touchend" : "mouseup",
+            LEAVE_EV = useTouchEvents ? SUPPORTS_POINTER ? "mouseleave" : null : "mouseleave",
+            CANCEL_EV = SUPPORTS_POINTER ? SUPPORTS_POINTER_IE10 ? "MSPointerCancel" : "pointercancel" : "touchcancel",
+            distance = 0,
+            direction = null,
+            currentDirection = null,
+            duration = 0,
+            startTouchesDistance = 0,
+            endTouchesDistance = 0,
+            pinchZoom = 1,
+            pinchDistance = 0,
+            pinchDirection = 0,
+            maximumsMap = null,
+            $element = $(element),
+            phase = "start",
+            fingerCount = 0,
+            fingerData = {},
+            startTime = 0,
+            endTime = 0,
+            previousTouchEndTime = 0,
+            fingerCountAtRelease = 0,
+            doubleTapStartTime = 0,
+            singleTapTimeout = null,
+            holdTimeout = null;
+        try {
+            $element.bind(START_EV, touchStart), $element.bind(CANCEL_EV, touchCancel)
+        } catch (e) {
+            $.error("events not supported " + START_EV + "," + CANCEL_EV + " on jQuery.swipe")
+        }
+        this.enable = function() {
+            return this.disable(), $element.bind(START_EV, touchStart), $element.bind(CANCEL_EV, touchCancel), $element
+        }, this.disable = function() {
+            return removeListeners(), $element
+        }, this.destroy = function() {
+            removeListeners(), $element.data(PLUGIN_NS, null), $element = null
+        }, this.option = function(property, value) {
+            if ("object" == typeof property) options = $.extend(options, property);
+            else if (void 0 !== options[property]) {
+                if (void 0 === value) return options[property];
+                options[property] = value
+            } else {
+                if (!property) return options;
+                $.error("Option " + property + " does not exist on jQuery.swipe.options")
+            }
+            return null
+        }
+    }
+    var VERSION = "1.6.18",
+        LEFT = "left",
+        RIGHT = "right",
+        UP = "up",
+        DOWN = "down",
+        IN = "in",
+        OUT = "out",
+        NONE = "none",
+        AUTO = "auto",
+        SWIPE = "swipe",
+        PINCH = "pinch",
+        TAP = "tap",
+        DOUBLE_TAP = "doubletap",
+        LONG_TAP = "longtap",
+        HORIZONTAL = "horizontal",
+        VERTICAL = "vertical",
+        ALL_FINGERS = "all",
+        DOUBLE_TAP_THRESHOLD = 10,
+        PHASE_START = "start",
+        PHASE_MOVE = "move",
+        PHASE_END = "end",
+        PHASE_CANCEL = "cancel",
+        SUPPORTS_TOUCH = "ontouchstart" in window,
+        SUPPORTS_POINTER_IE10 = window.navigator.msPointerEnabled && !window.navigator.pointerEnabled && !SUPPORTS_TOUCH,
+        SUPPORTS_POINTER = (window.navigator.pointerEnabled || window.navigator.msPointerEnabled) && !SUPPORTS_TOUCH,
+        PLUGIN_NS = "TouchSwipe",
+        defaults = {
+            fingers: 1,
+            threshold: 75,
+            cancelThreshold: null,
+            pinchThreshold: 20,
+            maxTimeThreshold: null,
+            fingerReleaseThreshold: 250,
+            longTapThreshold: 500,
+            doubleTapThreshold: 200,
+            swipe: null,
+            swipeLeft: null,
+            swipeRight: null,
+            swipeUp: null,
+            swipeDown: null,
+            swipeStatus: null,
+            pinchIn: null,
+            pinchOut: null,
+            pinchStatus: null,
+            click: null,
+            tap: null,
+            doubleTap: null,
+            longTap: null,
+            hold: null,
+            triggerOnTouchEnd: !0,
+            triggerOnTouchLeave: !1,
+            allowPageScroll: "auto",
+            fallbackToMouseEvents: !0,
+            excludedElements: ".noSwipe",
+            preventDefaultEvents: !0
+        };
+    $.fn.swipe = function(method) {
+        var $this = $(this),
+            plugin = $this.data(PLUGIN_NS);
+        if (plugin && "string" == typeof method) {
+            if (plugin[method]) return plugin[method].apply(plugin, Array.prototype.slice.call(arguments, 1));
+            $.error("Method " + method + " does not exist on jQuery.swipe")
+        } else if (plugin && "object" == typeof method) plugin.option.apply(plugin, arguments);
+        else if (!(plugin || "object" != typeof method && method)) return init.apply(this, arguments);
+        return $this
+    }, $.fn.swipe.version = VERSION, $.fn.swipe.defaults = defaults, $.fn.swipe.phases = {
+        PHASE_START: PHASE_START,
+        PHASE_MOVE: PHASE_MOVE,
+        PHASE_END: PHASE_END,
+        PHASE_CANCEL: PHASE_CANCEL
+    }, $.fn.swipe.directions = {
+        LEFT: LEFT,
+        RIGHT: RIGHT,
+        UP: UP,
+        DOWN: DOWN,
+        IN: IN,
+        OUT: OUT
+    }, $.fn.swipe.pageScroll = {
+        NONE: NONE,
+        HORIZONTAL: HORIZONTAL,
+        VERTICAL: VERTICAL,
+        AUTO: AUTO
+    }, $.fn.swipe.fingers = {
+        ONE: 1,
+        TWO: 2,
+        THREE: 3,
+        FOUR: 4,
+        FIVE: 5,
+        ALL: ALL_FINGERS
+    }
+});
+
+
+"use strict";
+(function(root, factory) {
+  if(typeof exports === 'object') {
+    module.exports = factory();
+  }
+  else if(typeof define === 'function' && define.amd) {
+    define(['jquery', 'googlemaps!'], factory);
+  }
+  else {
+    root.GMaps = factory();
+  }
+
+
+}(this, function() {
+
+/*!
+ * GMaps.js v0.4.25
+ * http://hpneo.github.com/gmaps/
+ *
+ * Copyright 2017, Gustavo Leon
+ * Released under the MIT License.
+ */
+
+var extend_object = function(obj, new_obj) {
+  var name;
+
+  if (obj === new_obj) {
+    return obj;
+  }
+
+  for (name in new_obj) {
+    if (new_obj[name] !== undefined) {
+      obj[name] = new_obj[name];
+    }
+  }
+
+  return obj;
+};
+
+var replace_object = function(obj, replace) {
+  var name;
+
+  if (obj === replace) {
+    return obj;
+  }
+
+  for (name in replace) {
+    if (obj[name] != undefined) {
+      obj[name] = replace[name];
+    }
+  }
+
+  return obj;
+};
+
+var array_map = function(array, callback) {
+  var original_callback_params = Array.prototype.slice.call(arguments, 2),
+      array_return = [],
+      array_length = array.length,
+      i;
+
+  if (Array.prototype.map && array.map === Array.prototype.map) {
+    array_return = Array.prototype.map.call(array, function(item) {
+      var callback_params = original_callback_params.slice(0);
+      callback_params.splice(0, 0, item);
+
+      return callback.apply(this, callback_params);
+    });
+  }
+  else {
+    for (i = 0; i < array_length; i++) {
+      callback_params = original_callback_params;
+      callback_params.splice(0, 0, array[i]);
+      array_return.push(callback.apply(this, callback_params));
+    }
+  }
+
+  return array_return;
+};
+
+var array_flat = function(array) {
+  var new_array = [],
+      i;
+
+  for (i = 0; i < array.length; i++) {
+    new_array = new_array.concat(array[i]);
+  }
+
+  return new_array;
+};
+
+var coordsToLatLngs = function(coords, useGeoJSON) {
+  var first_coord = coords[0],
+      second_coord = coords[1];
+
+  if (useGeoJSON) {
+    first_coord = coords[1];
+    second_coord = coords[0];
+  }
+
+  return new google.maps.LatLng(first_coord, second_coord);
+};
+
+var arrayToLatLng = function(coords, useGeoJSON) {
+  var i;
+
+  for (i = 0; i < coords.length; i++) {
+    if (!(coords[i] instanceof google.maps.LatLng)) {
+      if (coords[i].length > 0 && typeof(coords[i][0]) === "object") {
+        coords[i] = arrayToLatLng(coords[i], useGeoJSON);
+      }
+      else {
+        coords[i] = coordsToLatLngs(coords[i], useGeoJSON);
+      }
+    }
+  }
+
+  return coords;
+};
+
+var getElementsByClassName = function (class_name, context) {
+    var element,
+        _class = class_name.replace('.', '');
+
+    if ('jQuery' in this && context) {
+        element = $("." + _class, context)[0];
+    } else {
+        element = document.getElementsByClassName(_class)[0];
+    }
+    return element;
+
+};
+
+var getElementById = function(id, context) {
+  var element,
+  id = id.replace('#', '');
+
+  if ('jQuery' in window && context) {
+    element = $('#' + id, context)[0];
+  } else {
+    element = document.getElementById(id);
+  };
+
+  return element;
+};
+
+var findAbsolutePosition = function(obj)  {
+  var curleft = 0,
+      curtop = 0;
+
+  if (obj.getBoundingClientRect) {
+      var rect = obj.getBoundingClientRect();
+      var sx = -(window.scrollX ? window.scrollX : window.pageXOffset);
+      var sy = -(window.scrollY ? window.scrollY : window.pageYOffset);
+
+      return [(rect.left - sx), (rect.top - sy)];
+  }
+
+  if (obj.offsetParent) {
+    do {
+      curleft += obj.offsetLeft;
+      curtop += obj.offsetTop;
+    } while (obj = obj.offsetParent);
+  }
+
+  return [curleft, curtop];
+};
+
+var GMaps = (function(global) {
+  "use strict";
+
+  var doc = document;
+  /**
+   * Creates a new GMaps instance, including a Google Maps map.
+   * @class GMaps
+   * @constructs
+   * @param {object} options - `options` accepts all the [MapOptions](https://developers.google.com/maps/documentation/javascript/reference#MapOptions) and [events](https://developers.google.com/maps/documentation/javascript/reference#Map) listed in the Google Maps API. Also accepts:
+   * * `lat` (number): Latitude of the map's center
+   * * `lng` (number): Longitude of the map's center
+   * * `el` (string or HTMLElement): container where the map will be rendered
+   * * `markerClusterer` (function): A function to create a marker cluster. You can use MarkerClusterer or MarkerClustererPlus.
+   */
+  var GMaps = function(options) {
+
+    if (!(typeof window.google === 'object' && window.google.maps)) {
+      if (typeof window.console === 'object' && window.console.error) {
+        console.error('Google Maps API is required. Please register the following JavaScript library https://maps.googleapis.com/maps/api/js.');
+      }
+
+      return function() {};
+    }
+
+    if (!this) return new GMaps(options);
+
+    options.zoom = options.zoom || 15;
+    options.mapType = options.mapType || 'roadmap';
+
+    var valueOrDefault = function(value, defaultValue) {
+      return value === undefined ? defaultValue : value;
+    };
+
+    var self = this,
+        i,
+        events_that_hide_context_menu = [
+          'bounds_changed', 'center_changed', 'click', 'dblclick', 'drag',
+          'dragend', 'dragstart', 'idle', 'maptypeid_changed', 'projection_changed',
+          'resize', 'tilesloaded', 'zoom_changed'
+        ],
+        events_that_doesnt_hide_context_menu = ['mousemove', 'mouseout', 'mouseover'],
+        options_to_be_deleted = ['el', 'lat', 'lng', 'mapType', 'width', 'height', 'markerClusterer', 'enableNewStyle'],
+        identifier = options.el || options.div,
+        markerClustererFunction = options.markerClusterer,
+        mapType = google.maps.MapTypeId[options.mapType.toUpperCase()],
+        map_center = new google.maps.LatLng(options.lat, options.lng),
+        zoomControl = valueOrDefault(options.zoomControl, true),
+        zoomControlOpt = options.zoomControlOpt || {
+          style: 'DEFAULT',
+          position: 'TOP_LEFT'
+        },
+        zoomControlStyle = zoomControlOpt.style || 'DEFAULT',
+        zoomControlPosition = zoomControlOpt.position || 'TOP_LEFT',
+        panControl = valueOrDefault(options.panControl, true),
+        mapTypeControl = valueOrDefault(options.mapTypeControl, true),
+        scaleControl = valueOrDefault(options.scaleControl, true),
+        streetViewControl = valueOrDefault(options.streetViewControl, true),
+        overviewMapControl = valueOrDefault(overviewMapControl, true),
+        map_options = {},
+        map_base_options = {
+          zoom: this.zoom,
+          center: map_center,
+          mapTypeId: mapType
+        },
+        map_controls_options = {
+          panControl: panControl,
+          zoomControl: zoomControl,
+          zoomControlOptions: {
+            style: google.maps.ZoomControlStyle[zoomControlStyle],
+            position: google.maps.ControlPosition[zoomControlPosition]
+          },
+          mapTypeControl: mapTypeControl,
+          scaleControl: scaleControl,
+          streetViewControl: streetViewControl,
+          overviewMapControl: overviewMapControl
+        };
+
+      if (typeof(options.el) === 'string' || typeof(options.div) === 'string') {
+        if (identifier.indexOf("#") > -1) {
+            /**
+             * Container element
+             *
+             * @type {HTMLElement}
+             */
+            this.el = getElementById(identifier, options.context);
+        } else {
+            this.el = getElementsByClassName.apply(this, [identifier, options.context]);
+        }
+      } else {
+          this.el = identifier;
+      }
+
+    if (typeof(this.el) === 'undefined' || this.el === null) {
+      throw 'No element defined.';
+    }
+
+    window.context_menu = window.context_menu || {};
+    window.context_menu[self.el.id] = {};
+
+    /**
+     * Collection of custom controls in the map UI
+     *
+     * @type {array}
+     */
+    this.controls = [];
+    /**
+     * Collection of map's overlays
+     *
+     * @type {array}
+     */
+    this.overlays = [];
+    /**
+     * Collection of KML/GeoRSS and FusionTable layers
+     *
+     * @type {array}
+     */
+    this.layers = [];
+    /**
+     * Collection of data layers (See {@link GMaps#addLayer})
+     *
+     * @type {object}
+     */
+    this.singleLayers = {};
+    /**
+     * Collection of map's markers
+     *
+     * @type {array}
+     */
+    this.markers = [];
+    /**
+     * Collection of map's lines
+     *
+     * @type {array}
+     */
+    this.polylines = [];
+    /**
+     * Collection of map's routes requested by {@link GMaps#getRoutes}, {@link GMaps#renderRoute}, {@link GMaps#drawRoute}, {@link GMaps#travelRoute} or {@link GMaps#drawSteppedRoute}
+     *
+     * @type {array}
+     */
+    this.routes = [];
+    /**
+     * Collection of map's polygons
+     *
+     * @type {array}
+     */
+    this.polygons = [];
+    this.infoWindow = null;
+    this.overlay_el = null;
+    /**
+     * Current map's zoom
+     *
+     * @type {number}
+     */
+    this.zoom = options.zoom;
+    this.registered_events = {};
+
+    this.el.style.width = options.width || this.el.scrollWidth || this.el.offsetWidth;
+    this.el.style.height = options.height || this.el.scrollHeight || this.el.offsetHeight;
+
+    google.maps.visualRefresh = options.enableNewStyle;
+
+    for (i = 0; i < options_to_be_deleted.length; i++) {
+      delete options[options_to_be_deleted[i]];
+    }
+
+    if(options.disableDefaultUI != true) {
+      map_base_options = extend_object(map_base_options, map_controls_options);
+    }
+
+    map_options = extend_object(map_base_options, options);
+
+    for (i = 0; i < events_that_hide_context_menu.length; i++) {
+      delete map_options[events_that_hide_context_menu[i]];
+    }
+
+    for (i = 0; i < events_that_doesnt_hide_context_menu.length; i++) {
+      delete map_options[events_that_doesnt_hide_context_menu[i]];
+    }
+
+    /**
+     * Google Maps map instance
+     *
+     * @type {google.maps.Map}
+     */
+    this.map = new google.maps.Map(this.el, map_options);
+
+    if (markerClustererFunction) {
+      /**
+       * Marker Clusterer instance
+       *
+       * @type {object}
+       */
+      this.markerClusterer = markerClustererFunction.apply(this, [this.map]);
+    }
+
+    var buildContextMenuHTML = function(control, e) {
+      var html = '',
+          options = window.context_menu[self.el.id][control];
+
+      for (var i in options){
+        if (options.hasOwnProperty(i)) {
+          var option = options[i];
+
+          html += '<li><a id="' + control + '_' + i + '" href="#">' + option.title + '</a></li>';
+        }
+      }
+
+      if (!getElementById('gmaps_context_menu')) return;
+
+      var context_menu_element = getElementById('gmaps_context_menu');
+
+      context_menu_element.innerHTML = html;
+
+      var context_menu_items = context_menu_element.getElementsByTagName('a'),
+          context_menu_items_count = context_menu_items.length,
+          i;
+
+      for (i = 0; i < context_menu_items_count; i++) {
+        var context_menu_item = context_menu_items[i];
+
+        var assign_menu_item_action = function(ev){
+          ev.preventDefault();
+
+          options[this.id.replace(control + '_', '')].action.apply(self, [e]);
+          self.hideContextMenu();
+        };
+
+        google.maps.event.clearListeners(context_menu_item, 'click');
+        google.maps.event.addDomListenerOnce(context_menu_item, 'click', assign_menu_item_action, false);
+      }
+
+      var position = findAbsolutePosition.apply(this, [self.el]),
+          left = position[0] + e.pixel.x - 15,
+          top = position[1] + e.pixel.y- 15;
+
+      context_menu_element.style.left = left + "px";
+      context_menu_element.style.top = top + "px";
+
+      // context_menu_element.style.display = 'block';
+    };
+
+    this.buildContextMenu = function(control, e) {
+      if (control === 'marker') {
+        e.pixel = {};
+
+        var overlay = new google.maps.OverlayView();
+        overlay.setMap(self.map);
+
+        overlay.draw = function() {
+          var projection = overlay.getProjection(),
+              position = e.marker.getPosition();
+
+          e.pixel = projection.fromLatLngToContainerPixel(position);
+
+          buildContextMenuHTML(control, e);
+        };
+      }
+      else {
+        buildContextMenuHTML(control, e);
+      }
+
+      var context_menu_element = getElementById('gmaps_context_menu');
+
+      setTimeout(function() {
+        context_menu_element.style.display = 'block';
+      }, 0);
+    };
+
+    /**
+     * Add a context menu for a map or a marker.
+     *
+     * @param {object} options - The `options` object should contain:
+     * * `control` (string): Kind of control the context menu will be attached. Can be "map" or "marker".
+     * * `options` (array): A collection of context menu items:
+     *   * `title` (string): Item's title shown in the context menu.
+     *   * `name` (string): Item's identifier.
+     *   * `action` (function): Function triggered after selecting the context menu item.
+     */
+    this.setContextMenu = function(options) {
+      window.context_menu[self.el.id][options.control] = {};
+
+      var i,
+          ul = doc.createElement('ul');
+
+      for (i in options.options) {
+        if (options.options.hasOwnProperty(i)) {
+          var option = options.options[i];
+
+          window.context_menu[self.el.id][options.control][option.name] = {
+            title: option.title,
+            action: option.action
+          };
+        }
+      }
+
+      ul.id = 'gmaps_context_menu';
+      ul.style.display = 'none';
+      ul.style.position = 'absolute';
+      ul.style.minWidth = '100px';
+      ul.style.background = 'white';
+      ul.style.listStyle = 'none';
+      ul.style.padding = '8px';
+      ul.style.boxShadow = '2px 2px 6px #ccc';
+
+      if (!getElementById('gmaps_context_menu')) {
+        doc.body.appendChild(ul);
+      }
+
+      var context_menu_element = getElementById('gmaps_context_menu');
+
+      google.maps.event.addDomListener(context_menu_element, 'mouseout', function(ev) {
+        if (!ev.relatedTarget || !this.contains(ev.relatedTarget)) {
+          window.setTimeout(function(){
+            context_menu_element.style.display = 'none';
+          }, 400);
+        }
+      }, false);
+    };
+
+    /**
+     * Hide the current context menu
+     */
+    this.hideContextMenu = function() {
+      var context_menu_element = getElementById('gmaps_context_menu');
+
+      if (context_menu_element) {
+        context_menu_element.style.display = 'none';
+      }
+    };
+
+    var setupListener = function(object, name) {
+      google.maps.event.addListener(object, name, function(e){
+        if (e == undefined) {
+          e = this;
+        }
+
+        options[name].apply(this, [e]);
+
+        self.hideContextMenu();
+      });
+    };
+
+    //google.maps.event.addListener(this.map, 'idle', this.hideContextMenu);
+    google.maps.event.addListener(this.map, 'zoom_changed', this.hideContextMenu);
+
+    for (var ev = 0; ev < events_that_hide_context_menu.length; ev++) {
+      var name = events_that_hide_context_menu[ev];
+
+      if (name in options) {
+        setupListener(this.map, name);
+      }
+    }
+
+    for (var ev = 0; ev < events_that_doesnt_hide_context_menu.length; ev++) {
+      var name = events_that_doesnt_hide_context_menu[ev];
+
+      if (name in options) {
+        setupListener(this.map, name);
+      }
+    }
+
+    google.maps.event.addListener(this.map, 'rightclick', function(e) {
+      if (options.rightclick) {
+        options.rightclick.apply(this, [e]);
+      }
+
+      if(window.context_menu[self.el.id]['map'] != undefined) {
+        self.buildContextMenu('map', e);
+      }
+    });
+
+    /**
+     * Trigger a `resize` event, useful if you need to repaint the current map (for changes in the viewport or display / hide actions).
+     */
+    this.refresh = function() {
+      google.maps.event.trigger(this.map, 'resize');
+    };
+
+    /**
+     * Adjust the map zoom to include all the markers added in the map.
+     */
+    this.fitZoom = function() {
+      var latLngs = [],
+          markers_length = this.markers.length,
+          i;
+
+      for (i = 0; i < markers_length; i++) {
+        if(typeof(this.markers[i].visible) === 'boolean' && this.markers[i].visible) {
+          latLngs.push(this.markers[i].getPosition());
+        }
+      }
+
+      this.fitLatLngBounds(latLngs);
+    };
+
+    /**
+     * Adjust the map zoom to include all the coordinates in the `latLngs` array.
+     *
+     * @param {array} latLngs - Collection of `google.maps.LatLng` objects.
+     */
+    this.fitLatLngBounds = function(latLngs) {
+      var total = latLngs.length,
+          bounds = new google.maps.LatLngBounds(),
+          i;
+
+      for(i = 0; i < total; i++) {
+        bounds.extend(latLngs[i]);
+      }
+
+      this.map.fitBounds(bounds);
+    };
+
+    /**
+     * Center the map using the `lat` and `lng` coordinates.
+     *
+     * @param {number} lat - Latitude of the coordinate.
+     * @param {number} lng - Longitude of the coordinate.
+     * @param {function} [callback] - Callback that will be executed after the map is centered.
+     */
+    this.setCenter = function(lat, lng, callback) {
+      this.map.panTo(new google.maps.LatLng(lat, lng));
+
+      if (callback) {
+        callback();
+      }
+    };
+
+    /**
+     * Return the HTML element container of the map.
+     *
+     * @returns {HTMLElement} the element container.
+     */
+    this.getElement = function() {
+      return this.el;
+    };
+
+    /**
+     * Increase the map's zoom.
+     *
+     * @param {number} [magnitude] - The number of times the map will be zoomed in.
+     */
+    this.zoomIn = function(value) {
+      value = value || 1;
+
+      this.zoom = this.map.getZoom() + value;
+      this.map.setZoom(this.zoom);
+    };
+
+    /**
+     * Decrease the map's zoom.
+     *
+     * @param {number} [magnitude] - The number of times the map will be zoomed out.
+     */
+    this.zoomOut = function(value) {
+      value = value || 1;
+
+      this.zoom = this.map.getZoom() - value;
+      this.map.setZoom(this.zoom);
+    };
+
+    var native_methods = [],
+        method;
+
+    for (method in this.map) {
+      if (typeof(this.map[method]) == 'function' && !this[method]) {
+        native_methods.push(method);
+      }
+    }
+
+    for (i = 0; i < native_methods.length; i++) {
+      (function(gmaps, scope, method_name) {
+        gmaps[method_name] = function(){
+          return scope[method_name].apply(scope, arguments);
+        };
+      })(this, this.map, native_methods[i]);
+    }
+  };
+
+  return GMaps;
+})(this);
+
+GMaps.prototype.createControl = function(options) {
+  var control = document.createElement('div');
+
+  control.style.cursor = 'pointer';
+
+  if (options.disableDefaultStyles !== true) {
+    control.style.fontFamily = 'Roboto, Arial, sans-serif';
+    control.style.fontSize = '11px';
+    control.style.boxShadow = 'rgba(0, 0, 0, 0.298039) 0px 1px 4px -1px';
+  }
+
+  for (var option in options.style) {
+    control.style[option] = options.style[option];
+  }
+
+  if (options.id) {
+    control.id = options.id;
+  }
+
+  if (options.title) {
+    control.title = options.title;
+  }
+
+  if (options.classes) {
+    control.className = options.classes;
+  }
+
+  if (options.content) {
+    if (typeof options.content === 'string') {
+      control.innerHTML = options.content;
+    }
+    else if (options.content instanceof HTMLElement) {
+      control.appendChild(options.content);
+    }
+  }
+
+  if (options.position) {
+    control.position = google.maps.ControlPosition[options.position.toUpperCase()];
+  }
+
+  for (var ev in options.events) {
+    (function(object, name) {
+      google.maps.event.addDomListener(object, name, function(){
+        options.events[name].apply(this, [this]);
+      });
+    })(control, ev);
+  }
+
+  control.index = 1;
+
+  return control;
+};
+
+/**
+ * Add a custom control to the map UI.
+ *
+ * @param {object} options - The `options` object should contain:
+ * * `style` (object): The keys and values of this object should be valid CSS properties and values.
+ * * `id` (string): The HTML id for the custom control.
+ * * `classes` (string): A string containing all the HTML classes for the custom control.
+ * * `content` (string or HTML element): The content of the custom control.
+ * * `position` (string): Any valid [`google.maps.ControlPosition`](https://developers.google.com/maps/documentation/javascript/controls#ControlPositioning) value, in lower or upper case.
+ * * `events` (object): The keys of this object should be valid DOM events. The values should be functions.
+ * * `disableDefaultStyles` (boolean): If false, removes the default styles for the controls like font (family and size), and box shadow.
+ * @returns {HTMLElement}
+ */
+GMaps.prototype.addControl = function(options) {
+  var control = this.createControl(options);
+
+  this.controls.push(control);
+  this.map.controls[control.position].push(control);
+
+  return control;
+};
+
+/**
+ * Remove a control from the map. `control` should be a control returned by `addControl()`.
+ *
+ * @param {HTMLElement} control - One of the controls returned by `addControl()`.
+ * @returns {HTMLElement} the removed control.
+ */
+GMaps.prototype.removeControl = function(control) {
+  var position = null,
+      i;
+
+  for (i = 0; i < this.controls.length; i++) {
+    if (this.controls[i] == control) {
+      position = this.controls[i].position;
+      this.controls.splice(i, 1);
+    }
+  }
+
+  if (position) {
+    for (i = 0; i < this.map.controls.length; i++) {
+      var controlsForPosition = this.map.controls[control.position];
+
+      if (controlsForPosition.getAt(i) == control) {
+        controlsForPosition.removeAt(i);
+
+        break;
+      }
+    }
+  }
+
+  return control;
+};
+
+GMaps.prototype.createMarker = function(options) {
+  if (options.lat == undefined && options.lng == undefined && options.position == undefined) {
+    throw 'No latitude or longitude defined.';
+  }
+
+  var self = this,
+      details = options.details,
+      fences = options.fences,
+      outside = options.outside,
+      base_options = {
+        position: new google.maps.LatLng(options.lat, options.lng),
+        map: null
+      },
+      marker_options = extend_object(base_options, options);
+
+  delete marker_options.lat;
+  delete marker_options.lng;
+  delete marker_options.fences;
+  delete marker_options.outside;
+
+  var marker = new google.maps.Marker(marker_options);
+
+  marker.fences = fences;
+
+  if (options.infoWindow) {
+    marker.infoWindow = new google.maps.InfoWindow(options.infoWindow);
+
+    var info_window_events = ['closeclick', 'content_changed', 'domready', 'position_changed', 'zindex_changed'];
+
+    for (var ev = 0; ev < info_window_events.length; ev++) {
+      (function(object, name) {
+        if (options.infoWindow[name]) {
+          google.maps.event.addListener(object, name, function(e){
+            options.infoWindow[name].apply(this, [e]);
+          });
+        }
+      })(marker.infoWindow, info_window_events[ev]);
+    }
+  }
+
+  var marker_events = ['animation_changed', 'clickable_changed', 'cursor_changed', 'draggable_changed', 'flat_changed', 'icon_changed', 'position_changed', 'shadow_changed', 'shape_changed', 'title_changed', 'visible_changed', 'zindex_changed'];
+
+  var marker_events_with_mouse = ['dblclick', 'drag', 'dragend', 'dragstart', 'mousedown', 'mouseout', 'mouseover', 'mouseup'];
+
+  for (var ev = 0; ev < marker_events.length; ev++) {
+    (function(object, name) {
+      if (options[name]) {
+        google.maps.event.addListener(object, name, function(){
+          options[name].apply(this, [this]);
+        });
+      }
+    })(marker, marker_events[ev]);
+  }
+
+  for (var ev = 0; ev < marker_events_with_mouse.length; ev++) {
+    (function(map, object, name) {
+      if (options[name]) {
+        google.maps.event.addListener(object, name, function(me){
+          if(!me.pixel){
+            me.pixel = map.getProjection().fromLatLngToPoint(me.latLng)
+          }
+
+          options[name].apply(this, [me]);
+        });
+      }
+    })(this.map, marker, marker_events_with_mouse[ev]);
+  }
+
+  google.maps.event.addListener(marker, 'click', function() {
+    this.details = details;
+
+    if (options.click) {
+      options.click.apply(this, [this]);
+    }
+
+    if (marker.infoWindow) {
+      self.hideInfoWindows();
+      marker.infoWindow.open(self.map, marker);
+    }
+  });
+
+  google.maps.event.addListener(marker, 'rightclick', function(e) {
+    e.marker = this;
+
+    if (options.rightclick) {
+      options.rightclick.apply(this, [e]);
+    }
+
+    if (window.context_menu[self.el.id]['marker'] != undefined) {
+      self.buildContextMenu('marker', e);
+    }
+  });
+
+  if (marker.fences) {
+    google.maps.event.addListener(marker, 'dragend', function() {
+      self.checkMarkerGeofence(marker, function(m, f) {
+        outside(m, f);
+      });
+    });
+  }
+
+  return marker;
+};
+
+GMaps.prototype.addMarker = function(options) {
+  var marker;
+  if(options.hasOwnProperty('gm_accessors_')) {
+    // Native google.maps.Marker object
+    marker = options;
+  }
+  else {
+    if ((options.hasOwnProperty('lat') && options.hasOwnProperty('lng')) || options.position) {
+      marker = this.createMarker(options);
+    }
+    else {
+      throw 'No latitude or longitude defined.';
+    }
+  }
+
+  marker.setMap(this.map);
+
+  if(this.markerClusterer) {
+    this.markerClusterer.addMarker(marker);
+  }
+
+  this.markers.push(marker);
+
+  GMaps.fire('marker_added', marker, this);
+
+  return marker;
+};
+
+GMaps.prototype.addMarkers = function(array) {
+  for (var i = 0, marker; marker=array[i]; i++) {
+    this.addMarker(marker);
+  }
+
+  return this.markers;
+};
+
+GMaps.prototype.hideInfoWindows = function() {
+  for (var i = 0, marker; marker = this.markers[i]; i++){
+    if (marker.infoWindow) {
+      marker.infoWindow.close();
+    }
+  }
+};
+
+GMaps.prototype.removeMarker = function(marker) {
+  for (var i = 0; i < this.markers.length; i++) {
+    if (this.markers[i] === marker) {
+      this.markers[i].setMap(null);
+      this.markers.splice(i, 1);
+
+      if(this.markerClusterer) {
+        this.markerClusterer.removeMarker(marker);
+      }
+
+      GMaps.fire('marker_removed', marker, this);
+
+      break;
+    }
+  }
+
+  return marker;
+};
+
+GMaps.prototype.removeMarkers = function (collection) {
+  var new_markers = [];
+
+  if (typeof collection == 'undefined') {
+    for (var i = 0; i < this.markers.length; i++) {
+      var marker = this.markers[i];
+      marker.setMap(null);
+
+      GMaps.fire('marker_removed', marker, this);
+    }
+
+    if(this.markerClusterer && this.markerClusterer.clearMarkers) {
+      this.markerClusterer.clearMarkers();
+    }
+
+    this.markers = new_markers;
+  }
+  else {
+    for (var i = 0; i < collection.length; i++) {
+      var index = this.markers.indexOf(collection[i]);
+
+      if (index > -1) {
+        var marker = this.markers[index];
+        marker.setMap(null);
+
+        if(this.markerClusterer) {
+          this.markerClusterer.removeMarker(marker);
+        }
+
+        GMaps.fire('marker_removed', marker, this);
+      }
+    }
+
+    for (var i = 0; i < this.markers.length; i++) {
+      var marker = this.markers[i];
+      if (marker.getMap() != null) {
+        new_markers.push(marker);
+      }
+    }
+
+    this.markers = new_markers;
+  }
+};
+
+GMaps.prototype.drawOverlay = function(options) {
+  var overlay = new google.maps.OverlayView(),
+      auto_show = true;
+
+  overlay.setMap(this.map);
+
+  if (options.auto_show != null) {
+    auto_show = options.auto_show;
+  }
+
+  overlay.onAdd = function() {
+    var el = document.createElement('div');
+
+    el.style.borderStyle = "none";
+    el.style.borderWidth = "0px";
+    el.style.position = "absolute";
+    el.style.zIndex = 100;
+    el.innerHTML = options.content;
+
+    overlay.el = el;
+
+    if (!options.layer) {
+      options.layer = 'overlayLayer';
+    }
+    
+    var panes = this.getPanes(),
+        overlayLayer = panes[options.layer],
+        stop_overlay_events = ['contextmenu', 'DOMMouseScroll', 'dblclick', 'mousedown'];
+
+    overlayLayer.appendChild(el);
+
+    for (var ev = 0; ev < stop_overlay_events.length; ev++) {
+      (function(object, name) {
+        google.maps.event.addDomListener(object, name, function(e){
+          if (navigator.userAgent.toLowerCase().indexOf('msie') != -1 && document.all) {
+            e.cancelBubble = true;
+            e.returnValue = false;
+          }
+          else {
+            e.stopPropagation();
+          }
+        });
+      })(el, stop_overlay_events[ev]);
+    }
+
+    if (options.click) {
+      panes.overlayMouseTarget.appendChild(overlay.el);
+      google.maps.event.addDomListener(overlay.el, 'click', function() {
+        options.click.apply(overlay, [overlay]);
+      });
+    }
+
+    google.maps.event.trigger(this, 'ready');
+  };
+
+  overlay.draw = function() {
+    var projection = this.getProjection(),
+        pixel = projection.fromLatLngToDivPixel(new google.maps.LatLng(options.lat, options.lng));
+
+    options.horizontalOffset = options.horizontalOffset || 0;
+    options.verticalOffset = options.verticalOffset || 0;
+
+    var el = overlay.el,
+        content = el.children[0],
+        content_height = content.clientHeight,
+        content_width = content.clientWidth;
+
+    switch (options.verticalAlign) {
+      case 'top':
+        el.style.top = (pixel.y - content_height + options.verticalOffset) + 'px';
+        break;
+      default:
+      case 'middle':
+        el.style.top = (pixel.y - (content_height / 2) + options.verticalOffset) + 'px';
+        break;
+      case 'bottom':
+        el.style.top = (pixel.y + options.verticalOffset) + 'px';
+        break;
+    }
+
+    switch (options.horizontalAlign) {
+      case 'left':
+        el.style.left = (pixel.x - content_width + options.horizontalOffset) + 'px';
+        break;
+      default:
+      case 'center':
+        el.style.left = (pixel.x - (content_width / 2) + options.horizontalOffset) + 'px';
+        break;
+      case 'right':
+        el.style.left = (pixel.x + options.horizontalOffset) + 'px';
+        break;
+    }
+
+    el.style.display = auto_show ? 'block' : 'none';
+
+    if (!auto_show) {
+      options.show.apply(this, [el]);
+    }
+  };
+
+  overlay.onRemove = function() {
+    var el = overlay.el;
+
+    if (options.remove) {
+      options.remove.apply(this, [el]);
+    }
+    else {
+      overlay.el.parentNode.removeChild(overlay.el);
+      overlay.el = null;
+    }
+  };
+
+  this.overlays.push(overlay);
+  return overlay;
+};
+
+GMaps.prototype.removeOverlay = function(overlay) {
+  for (var i = 0; i < this.overlays.length; i++) {
+    if (this.overlays[i] === overlay) {
+      this.overlays[i].setMap(null);
+      this.overlays.splice(i, 1);
+
+      break;
+    }
+  }
+};
+
+GMaps.prototype.removeOverlays = function() {
+  for (var i = 0, item; item = this.overlays[i]; i++) {
+    item.setMap(null);
+  }
+
+  this.overlays = [];
+};
+
+GMaps.prototype.drawPolyline = function(options) {
+  var path = [],
+      points = options.path;
+
+  if (points.length) {
+    if (points[0][0] === undefined) {
+      path = points;
+    }
+    else {
+      for (var i = 0, latlng; latlng = points[i]; i++) {
+        path.push(new google.maps.LatLng(latlng[0], latlng[1]));
+      }
+    }
+  }
+
+  var polyline_options = {
+    map: this.map,
+    path: path,
+    strokeColor: options.strokeColor,
+    strokeOpacity: options.strokeOpacity,
+    strokeWeight: options.strokeWeight,
+    geodesic: options.geodesic,
+    clickable: true,
+    editable: false,
+    visible: true
+  };
+
+  if (options.hasOwnProperty("clickable")) {
+    polyline_options.clickable = options.clickable;
+  }
+
+  if (options.hasOwnProperty("editable")) {
+    polyline_options.editable = options.editable;
+  }
+
+  if (options.hasOwnProperty("icons")) {
+    polyline_options.icons = options.icons;
+  }
+
+  if (options.hasOwnProperty("zIndex")) {
+    polyline_options.zIndex = options.zIndex;
+  }
+
+  var polyline = new google.maps.Polyline(polyline_options);
+
+  var polyline_events = ['click', 'dblclick', 'mousedown', 'mousemove', 'mouseout', 'mouseover', 'mouseup', 'rightclick'];
+
+  for (var ev = 0; ev < polyline_events.length; ev++) {
+    (function(object, name) {
+      if (options[name]) {
+        google.maps.event.addListener(object, name, function(e){
+          options[name].apply(this, [e]);
+        });
+      }
+    })(polyline, polyline_events[ev]);
+  }
+
+  this.polylines.push(polyline);
+
+  GMaps.fire('polyline_added', polyline, this);
+
+  return polyline;
+};
+
+GMaps.prototype.removePolyline = function(polyline) {
+  for (var i = 0; i < this.polylines.length; i++) {
+    if (this.polylines[i] === polyline) {
+      this.polylines[i].setMap(null);
+      this.polylines.splice(i, 1);
+
+      GMaps.fire('polyline_removed', polyline, this);
+
+      break;
+    }
+  }
+};
+
+GMaps.prototype.removePolylines = function() {
+  for (var i = 0, item; item = this.polylines[i]; i++) {
+    item.setMap(null);
+  }
+
+  this.polylines = [];
+};
+
+GMaps.prototype.drawCircle = function(options) {
+  options =  extend_object({
+    map: this.map,
+    center: new google.maps.LatLng(options.lat, options.lng)
+  }, options);
+
+  delete options.lat;
+  delete options.lng;
+
+  var polygon = new google.maps.Circle(options),
+      polygon_events = ['click', 'dblclick', 'mousedown', 'mousemove', 'mouseout', 'mouseover', 'mouseup', 'rightclick'];
+
+  for (var ev = 0; ev < polygon_events.length; ev++) {
+    (function(object, name) {
+      if (options[name]) {
+        google.maps.event.addListener(object, name, function(e){
+          options[name].apply(this, [e]);
+        });
+      }
+    })(polygon, polygon_events[ev]);
+  }
+
+  this.polygons.push(polygon);
+
+  return polygon;
+};
+
+GMaps.prototype.drawRectangle = function(options) {
+  options = extend_object({
+    map: this.map
+  }, options);
+
+  var latLngBounds = new google.maps.LatLngBounds(
+    new google.maps.LatLng(options.bounds[0][0], options.bounds[0][1]),
+    new google.maps.LatLng(options.bounds[1][0], options.bounds[1][1])
+  );
+
+  options.bounds = latLngBounds;
+
+  var polygon = new google.maps.Rectangle(options),
+      polygon_events = ['click', 'dblclick', 'mousedown', 'mousemove', 'mouseout', 'mouseover', 'mouseup', 'rightclick'];
+
+  for (var ev = 0; ev < polygon_events.length; ev++) {
+    (function(object, name) {
+      if (options[name]) {
+        google.maps.event.addListener(object, name, function(e){
+          options[name].apply(this, [e]);
+        });
+      }
+    })(polygon, polygon_events[ev]);
+  }
+
+  this.polygons.push(polygon);
+
+  return polygon;
+};
+
+GMaps.prototype.drawPolygon = function(options) {
+  var useGeoJSON = false;
+
+  if(options.hasOwnProperty("useGeoJSON")) {
+    useGeoJSON = options.useGeoJSON;
+  }
+
+  delete options.useGeoJSON;
+
+  options = extend_object({
+    map: this.map
+  }, options);
+
+  if (useGeoJSON == false) {
+    options.paths = [options.paths.slice(0)];
+  }
+
+  if (options.paths.length > 0) {
+    if (options.paths[0].length > 0) {
+      options.paths = array_flat(array_map(options.paths, arrayToLatLng, useGeoJSON));
+    }
+  }
+
+  var polygon = new google.maps.Polygon(options),
+      polygon_events = ['click', 'dblclick', 'mousedown', 'mousemove', 'mouseout', 'mouseover', 'mouseup', 'rightclick'];
+
+  for (var ev = 0; ev < polygon_events.length; ev++) {
+    (function(object, name) {
+      if (options[name]) {
+        google.maps.event.addListener(object, name, function(e){
+          options[name].apply(this, [e]);
+        });
+      }
+    })(polygon, polygon_events[ev]);
+  }
+
+  this.polygons.push(polygon);
+
+  GMaps.fire('polygon_added', polygon, this);
+
+  return polygon;
+};
+
+GMaps.prototype.removePolygon = function(polygon) {
+  for (var i = 0; i < this.polygons.length; i++) {
+    if (this.polygons[i] === polygon) {
+      this.polygons[i].setMap(null);
+      this.polygons.splice(i, 1);
+
+      GMaps.fire('polygon_removed', polygon, this);
+
+      break;
+    }
+  }
+};
+
+GMaps.prototype.removePolygons = function() {
+  for (var i = 0, item; item = this.polygons[i]; i++) {
+    item.setMap(null);
+  }
+
+  this.polygons = [];
+};
+
+GMaps.prototype.getFromFusionTables = function(options) {
+  var events = options.events;
+
+  delete options.events;
+
+  var fusion_tables_options = options,
+      layer = new google.maps.FusionTablesLayer(fusion_tables_options);
+
+  for (var ev in events) {
+    (function(object, name) {
+      google.maps.event.addListener(object, name, function(e) {
+        events[name].apply(this, [e]);
+      });
+    })(layer, ev);
+  }
+
+  this.layers.push(layer);
+
+  return layer;
+};
+
+GMaps.prototype.loadFromFusionTables = function(options) {
+  var layer = this.getFromFusionTables(options);
+  layer.setMap(this.map);
+
+  return layer;
+};
+
+GMaps.prototype.getFromKML = function(options) {
+  var url = options.url,
+      events = options.events;
+
+  delete options.url;
+  delete options.events;
+
+  var kml_options = options,
+      layer = new google.maps.KmlLayer(url, kml_options);
+
+  for (var ev in events) {
+    (function(object, name) {
+      google.maps.event.addListener(object, name, function(e) {
+        events[name].apply(this, [e]);
+      });
+    })(layer, ev);
+  }
+
+  this.layers.push(layer);
+
+  return layer;
+};
+
+GMaps.prototype.loadFromKML = function(options) {
+  var layer = this.getFromKML(options);
+  layer.setMap(this.map);
+
+  return layer;
+};
+
+GMaps.prototype.addLayer = function(layerName, options) {
+  //var default_layers = ['weather', 'clouds', 'traffic', 'transit', 'bicycling', 'panoramio', 'places'];
+  options = options || {};
+  var layer;
+
+  switch(layerName) {
+    case 'weather': this.singleLayers.weather = layer = new google.maps.weather.WeatherLayer();
+      break;
+    case 'clouds': this.singleLayers.clouds = layer = new google.maps.weather.CloudLayer();
+      break;
+    case 'traffic': this.singleLayers.traffic = layer = new google.maps.TrafficLayer();
+      break;
+    case 'transit': this.singleLayers.transit = layer = new google.maps.TransitLayer();
+      break;
+    case 'bicycling': this.singleLayers.bicycling = layer = new google.maps.BicyclingLayer();
+      break;
+    case 'panoramio':
+        this.singleLayers.panoramio = layer = new google.maps.panoramio.PanoramioLayer();
+        layer.setTag(options.filter);
+        delete options.filter;
+
+        //click event
+        if (options.click) {
+          google.maps.event.addListener(layer, 'click', function(event) {
+            options.click(event);
+            delete options.click;
+          });
+        }
+      break;
+      case 'places':
+        this.singleLayers.places = layer = new google.maps.places.PlacesService(this.map);
+
+        //search, nearbySearch, radarSearch callback, Both are the same
+        if (options.search || options.nearbySearch || options.radarSearch) {
+          var placeSearchRequest  = {
+            bounds : options.bounds || null,
+            keyword : options.keyword || null,
+            location : options.location || null,
+            name : options.name || null,
+            radius : options.radius || null,
+            rankBy : options.rankBy || null,
+            types : options.types || null
+          };
+
+          if (options.radarSearch) {
+            layer.radarSearch(placeSearchRequest, options.radarSearch);
+          }
+
+          if (options.search) {
+            layer.search(placeSearchRequest, options.search);
+          }
+
+          if (options.nearbySearch) {
+            layer.nearbySearch(placeSearchRequest, options.nearbySearch);
+          }
+        }
+
+        //textSearch callback
+        if (options.textSearch) {
+          var textSearchRequest  = {
+            bounds : options.bounds || null,
+            location : options.location || null,
+            query : options.query || null,
+            radius : options.radius || null
+          };
+
+          layer.textSearch(textSearchRequest, options.textSearch);
+        }
+      break;
+  }
+
+  if (layer !== undefined) {
+    if (typeof layer.setOptions == 'function') {
+      layer.setOptions(options);
+    }
+    if (typeof layer.setMap == 'function') {
+      layer.setMap(this.map);
+    }
+
+    return layer;
+  }
+};
+
+GMaps.prototype.removeLayer = function(layer) {
+  if (typeof(layer) == "string" && this.singleLayers[layer] !== undefined) {
+     this.singleLayers[layer].setMap(null);
+
+     delete this.singleLayers[layer];
+  }
+  else {
+    for (var i = 0; i < this.layers.length; i++) {
+      if (this.layers[i] === layer) {
+        this.layers[i].setMap(null);
+        this.layers.splice(i, 1);
+
+        break;
+      }
+    }
+  }
+};
+
+var travelMode, unitSystem;
+
+GMaps.prototype.getRoutes = function(options) {
+  switch (options.travelMode) {
+    case 'bicycling':
+      travelMode = google.maps.TravelMode.BICYCLING;
+      break;
+    case 'transit':
+      travelMode = google.maps.TravelMode.TRANSIT;
+      break;
+    case 'driving':
+      travelMode = google.maps.TravelMode.DRIVING;
+      break;
+    default:
+      travelMode = google.maps.TravelMode.WALKING;
+      break;
+  }
+
+  if (options.unitSystem === 'imperial') {
+    unitSystem = google.maps.UnitSystem.IMPERIAL;
+  }
+  else {
+    unitSystem = google.maps.UnitSystem.METRIC;
+  }
+
+  var base_options = {
+        avoidHighways: false,
+        avoidTolls: false,
+        optimizeWaypoints: false,
+        waypoints: []
+      },
+      request_options =  extend_object(base_options, options);
+
+  request_options.origin = /string/.test(typeof options.origin) ? options.origin : new google.maps.LatLng(options.origin[0], options.origin[1]);
+  request_options.destination = /string/.test(typeof options.destination) ? options.destination : new google.maps.LatLng(options.destination[0], options.destination[1]);
+  request_options.travelMode = travelMode;
+  request_options.unitSystem = unitSystem;
+
+  delete request_options.callback;
+  delete request_options.error;
+
+  var self = this,
+      routes = [],
+      service = new google.maps.DirectionsService();
+
+  service.route(request_options, function(result, status) {
+    if (status === google.maps.DirectionsStatus.OK) {
+      for (var r in result.routes) {
+        if (result.routes.hasOwnProperty(r)) {
+          routes.push(result.routes[r]);
+        }
+      }
+
+      if (options.callback) {
+        options.callback(routes, result, status);
+      }
+    }
+    else {
+      if (options.error) {
+        options.error(result, status);
+      }
+    }
+  });
+};
+
+GMaps.prototype.removeRoutes = function() {
+  this.routes.length = 0;
+};
+
+GMaps.prototype.getElevations = function(options) {
+  options = extend_object({
+    locations: [],
+    path : false,
+    samples : 256
+  }, options);
+
+  if (options.locations.length > 0) {
+    if (options.locations[0].length > 0) {
+      options.locations = array_flat(array_map([options.locations], arrayToLatLng,  false));
+    }
+  }
+
+  var callback = options.callback;
+  delete options.callback;
+
+  var service = new google.maps.ElevationService();
+
+  //location request
+  if (!options.path) {
+    delete options.path;
+    delete options.samples;
+
+    service.getElevationForLocations(options, function(result, status) {
+      if (callback && typeof(callback) === "function") {
+        callback(result, status);
+      }
+    });
+  //path request
+  } else {
+    var pathRequest = {
+      path : options.locations,
+      samples : options.samples
+    };
+
+    service.getElevationAlongPath(pathRequest, function(result, status) {
+     if (callback && typeof(callback) === "function") {
+        callback(result, status);
+      }
+    });
+  }
+};
+
+GMaps.prototype.cleanRoute = GMaps.prototype.removePolylines;
+
+GMaps.prototype.renderRoute = function(options, renderOptions) {
+  var self = this,
+      panel = ((typeof renderOptions.panel === 'string') ? document.getElementById(renderOptions.panel.replace('#', '')) : renderOptions.panel),
+      display;
+
+  renderOptions.panel = panel;
+  renderOptions = extend_object({
+    map: this.map
+  }, renderOptions);
+  display = new google.maps.DirectionsRenderer(renderOptions);
+
+  this.getRoutes({
+    origin: options.origin,
+    destination: options.destination,
+    travelMode: options.travelMode,
+    waypoints: options.waypoints,
+    unitSystem: options.unitSystem,
+    error: options.error,
+    avoidHighways: options.avoidHighways,
+    avoidTolls: options.avoidTolls,
+    optimizeWaypoints: options.optimizeWaypoints,
+    callback: function(routes, response, status) {
+      if (status === google.maps.DirectionsStatus.OK) {
+        display.setDirections(response);
+      }
+    }
+  });
+};
+
+GMaps.prototype.drawRoute = function(options) {
+  var self = this;
+
+  this.getRoutes({
+    origin: options.origin,
+    destination: options.destination,
+    travelMode: options.travelMode,
+    waypoints: options.waypoints,
+    unitSystem: options.unitSystem,
+    error: options.error,
+    avoidHighways: options.avoidHighways,
+    avoidTolls: options.avoidTolls,
+    optimizeWaypoints: options.optimizeWaypoints,
+    callback: function(routes) {
+      if (routes.length > 0) {
+        var polyline_options = {
+          path: routes[routes.length - 1].overview_path,
+          strokeColor: options.strokeColor,
+          strokeOpacity: options.strokeOpacity,
+          strokeWeight: options.strokeWeight
+        };
+
+        if (options.hasOwnProperty("icons")) {
+          polyline_options.icons = options.icons;
+        }
+
+        self.drawPolyline(polyline_options);
+
+        if (options.callback) {
+          options.callback(routes[routes.length - 1]);
+        }
+      }
+    }
+  });
+};
+
+GMaps.prototype.travelRoute = function(options) {
+  if (options.origin && options.destination) {
+    this.getRoutes({
+      origin: options.origin,
+      destination: options.destination,
+      travelMode: options.travelMode,
+      waypoints : options.waypoints,
+      unitSystem: options.unitSystem,
+      error: options.error,
+      callback: function(e) {
+        //start callback
+        if (e.length > 0 && options.start) {
+          options.start(e[e.length - 1]);
+        }
+
+        //step callback
+        if (e.length > 0 && options.step) {
+          var route = e[e.length - 1];
+          if (route.legs.length > 0) {
+            var steps = route.legs[0].steps;
+            for (var i = 0, step; step = steps[i]; i++) {
+              step.step_number = i;
+              options.step(step, (route.legs[0].steps.length - 1));
+            }
+          }
+        }
+
+        //end callback
+        if (e.length > 0 && options.end) {
+           options.end(e[e.length - 1]);
+        }
+      }
+    });
+  }
+  else if (options.route) {
+    if (options.route.legs.length > 0) {
+      var steps = options.route.legs[0].steps;
+      for (var i = 0, step; step = steps[i]; i++) {
+        step.step_number = i;
+        options.step(step);
+      }
+    }
+  }
+};
+
+GMaps.prototype.drawSteppedRoute = function(options) {
+  var self = this;
+
+  if (options.origin && options.destination) {
+    this.getRoutes({
+      origin: options.origin,
+      destination: options.destination,
+      travelMode: options.travelMode,
+      waypoints : options.waypoints,
+      error: options.error,
+      callback: function(e) {
+        //start callback
+        if (e.length > 0 && options.start) {
+          options.start(e[e.length - 1]);
+        }
+
+        //step callback
+        if (e.length > 0 && options.step) {
+          var route = e[e.length - 1];
+          if (route.legs.length > 0) {
+            var steps = route.legs[0].steps;
+            for (var i = 0, step; step = steps[i]; i++) {
+              step.step_number = i;
+              var polyline_options = {
+                path: step.path,
+                strokeColor: options.strokeColor,
+                strokeOpacity: options.strokeOpacity,
+                strokeWeight: options.strokeWeight
+              };
+
+              if (options.hasOwnProperty("icons")) {
+                polyline_options.icons = options.icons;
+              }
+
+              self.drawPolyline(polyline_options);
+              options.step(step, (route.legs[0].steps.length - 1));
+            }
+          }
+        }
+
+        //end callback
+        if (e.length > 0 && options.end) {
+           options.end(e[e.length - 1]);
+        }
+      }
+    });
+  }
+  else if (options.route) {
+    if (options.route.legs.length > 0) {
+      var steps = options.route.legs[0].steps;
+      for (var i = 0, step; step = steps[i]; i++) {
+        step.step_number = i;
+        var polyline_options = {
+          path: step.path,
+          strokeColor: options.strokeColor,
+          strokeOpacity: options.strokeOpacity,
+          strokeWeight: options.strokeWeight
+        };
+
+        if (options.hasOwnProperty("icons")) {
+          polyline_options.icons = options.icons;
+        }
+
+        self.drawPolyline(polyline_options);
+        options.step(step);
+      }
+    }
+  }
+};
+
+GMaps.Route = function(options) {
+  this.origin = options.origin;
+  this.destination = options.destination;
+  this.waypoints = options.waypoints;
+
+  this.map = options.map;
+  this.route = options.route;
+  this.step_count = 0;
+  this.steps = this.route.legs[0].steps;
+  this.steps_length = this.steps.length;
+
+  var polyline_options = {
+    path: new google.maps.MVCArray(),
+    strokeColor: options.strokeColor,
+    strokeOpacity: options.strokeOpacity,
+    strokeWeight: options.strokeWeight
+  };
+
+  if (options.hasOwnProperty("icons")) {
+    polyline_options.icons = options.icons;
+  }
+
+  this.polyline = this.map.drawPolyline(polyline_options).getPath();
+};
+
+GMaps.Route.prototype.getRoute = function(options) {
+  var self = this;
+
+  this.map.getRoutes({
+    origin : this.origin,
+    destination : this.destination,
+    travelMode : options.travelMode,
+    waypoints : this.waypoints || [],
+    error: options.error,
+    callback : function() {
+      self.route = e[0];
+
+      if (options.callback) {
+        options.callback.call(self);
+      }
+    }
+  });
+};
+
+GMaps.Route.prototype.back = function() {
+  if (this.step_count > 0) {
+    this.step_count--;
+    var path = this.route.legs[0].steps[this.step_count].path;
+
+    for (var p in path){
+      if (path.hasOwnProperty(p)){
+        this.polyline.pop();
+      }
+    }
+  }
+};
+
+GMaps.Route.prototype.forward = function() {
+  if (this.step_count < this.steps_length) {
+    var path = this.route.legs[0].steps[this.step_count].path;
+
+    for (var p in path){
+      if (path.hasOwnProperty(p)){
+        this.polyline.push(path[p]);
+      }
+    }
+    this.step_count++;
+  }
+};
+
+GMaps.prototype.checkGeofence = function(lat, lng, fence) {
+  return fence.containsLatLng(new google.maps.LatLng(lat, lng));
+};
+
+GMaps.prototype.checkMarkerGeofence = function(marker, outside_callback) {
+  if (marker.fences) {
+    for (var i = 0, fence; fence = marker.fences[i]; i++) {
+      var pos = marker.getPosition();
+      if (!this.checkGeofence(pos.lat(), pos.lng(), fence)) {
+        outside_callback(marker, fence);
+      }
+    }
+  }
+};
+
+GMaps.prototype.toImage = function(options) {
+  var options = options || {},
+      static_map_options = {};
+
+  static_map_options['size'] = options['size'] || [this.el.clientWidth, this.el.clientHeight];
+  static_map_options['lat'] = this.getCenter().lat();
+  static_map_options['lng'] = this.getCenter().lng();
+
+  if (this.markers.length > 0) {
+    static_map_options['markers'] = [];
+    
+    for (var i = 0; i < this.markers.length; i++) {
+      static_map_options['markers'].push({
+        lat: this.markers[i].getPosition().lat(),
+        lng: this.markers[i].getPosition().lng()
+      });
+    }
+  }
+
+  if (this.polylines.length > 0) {
+    var polyline = this.polylines[0];
+    
+    static_map_options['polyline'] = {};
+    static_map_options['polyline']['path'] = google.maps.geometry.encoding.encodePath(polyline.getPath());
+    static_map_options['polyline']['strokeColor'] = polyline.strokeColor
+    static_map_options['polyline']['strokeOpacity'] = polyline.strokeOpacity
+    static_map_options['polyline']['strokeWeight'] = polyline.strokeWeight
+  }
+
+  return GMaps.staticMapURL(static_map_options);
+};
+
+GMaps.staticMapURL = function(options){
+  var parameters = [],
+      data,
+      static_root = (location.protocol === 'file:' ? 'http:' : location.protocol ) + '//maps.googleapis.com/maps/api/staticmap';
+
+  if (options.url) {
+    static_root = options.url;
+    delete options.url;
+  }
+
+  static_root += '?';
+
+  var markers = options.markers;
+  
+  delete options.markers;
+
+  if (!markers && options.marker) {
+    markers = [options.marker];
+    delete options.marker;
+  }
+
+  var styles = options.styles;
+
+  delete options.styles;
+
+  var polyline = options.polyline;
+  delete options.polyline;
+
+  /** Map options **/
+  if (options.center) {
+    parameters.push('center=' + options.center);
+    delete options.center;
+  }
+  else if (options.address) {
+    parameters.push('center=' + options.address);
+    delete options.address;
+  }
+  else if (options.lat) {
+    parameters.push(['center=', options.lat, ',', options.lng].join(''));
+    delete options.lat;
+    delete options.lng;
+  }
+  else if (options.visible) {
+    var visible = encodeURI(options.visible.join('|'));
+    parameters.push('visible=' + visible);
+  }
+
+  var size = options.size;
+  if (size) {
+    if (size.join) {
+      size = size.join('x');
+    }
+    delete options.size;
+  }
+  else {
+    size = '630x300';
+  }
+  parameters.push('size=' + size);
+
+  if (!options.zoom && options.zoom !== false) {
+    options.zoom = 15;
+  }
+
+  var sensor = options.hasOwnProperty('sensor') ? !!options.sensor : true;
+  delete options.sensor;
+  parameters.push('sensor=' + sensor);
+
+  for (var param in options) {
+    if (options.hasOwnProperty(param)) {
+      parameters.push(param + '=' + options[param]);
+    }
+  }
+
+  /** Markers **/
+  if (markers) {
+    var marker, loc;
+
+    for (var i = 0; data = markers[i]; i++) {
+      marker = [];
+
+      if (data.size && data.size !== 'normal') {
+        marker.push('size:' + data.size);
+        delete data.size;
+      }
+      else if (data.icon) {
+        marker.push('icon:' + encodeURI(data.icon));
+        delete data.icon;
+      }
+
+      if (data.color) {
+        marker.push('color:' + data.color.replace('#', '0x'));
+        delete data.color;
+      }
+
+      if (data.label) {
+        marker.push('label:' + data.label[0].toUpperCase());
+        delete data.label;
+      }
+
+      loc = (data.address ? data.address : data.lat + ',' + data.lng);
+      delete data.address;
+      delete data.lat;
+      delete data.lng;
+
+      for(var param in data){
+        if (data.hasOwnProperty(param)) {
+          marker.push(param + ':' + data[param]);
+        }
+      }
+
+      if (marker.length || i === 0) {
+        marker.push(loc);
+        marker = marker.join('|');
+        parameters.push('markers=' + encodeURI(marker));
+      }
+      // New marker without styles
+      else {
+        marker = parameters.pop() + encodeURI('|' + loc);
+        parameters.push(marker);
+      }
+    }
+  }
+
+  /** Map Styles **/
+  if (styles) {
+    for (var i = 0; i < styles.length; i++) {
+      var styleRule = [];
+      if (styles[i].featureType){
+        styleRule.push('feature:' + styles[i].featureType.toLowerCase());
+      }
+
+      if (styles[i].elementType) {
+        styleRule.push('element:' + styles[i].elementType.toLowerCase());
+      }
+
+      for (var j = 0; j < styles[i].stylers.length; j++) {
+        for (var p in styles[i].stylers[j]) {
+          var ruleArg = styles[i].stylers[j][p];
+          if (p == 'hue' || p == 'color') {
+            ruleArg = '0x' + ruleArg.substring(1);
+          }
+          styleRule.push(p + ':' + ruleArg);
+        }
+      }
+
+      var rule = styleRule.join('|');
+      if (rule != '') {
+        parameters.push('style=' + rule);
+      }
+    }
+  }
+
+  /** Polylines **/
+  function parseColor(color, opacity) {
+    if (color[0] === '#'){
+      color = color.replace('#', '0x');
+
+      if (opacity) {
+        opacity = parseFloat(opacity);
+        opacity = Math.min(1, Math.max(opacity, 0));
+        if (opacity === 0) {
+          return '0x00000000';
+        }
+        opacity = (opacity * 255).toString(16);
+        if (opacity.length === 1) {
+          opacity += opacity;
+        }
+
+        color = color.slice(0,8) + opacity;
+      }
+    }
+    return color;
+  }
+
+  if (polyline) {
+    data = polyline;
+    polyline = [];
+
+    if (data.strokeWeight) {
+      polyline.push('weight:' + parseInt(data.strokeWeight, 10));
+    }
+
+    if (data.strokeColor) {
+      var color = parseColor(data.strokeColor, data.strokeOpacity);
+      polyline.push('color:' + color);
+    }
+
+    if (data.fillColor) {
+      var fillcolor = parseColor(data.fillColor, data.fillOpacity);
+      polyline.push('fillcolor:' + fillcolor);
+    }
+
+    var path = data.path;
+    if (path.join) {
+      for (var j=0, pos; pos=path[j]; j++) {
+        polyline.push(pos.join(','));
+      }
+    }
+    else {
+      polyline.push('enc:' + path);
+    }
+
+    polyline = polyline.join('|');
+    parameters.push('path=' + encodeURI(polyline));
+  }
+
+  /** Retina support **/
+  var dpi = window.devicePixelRatio || 1;
+  parameters.push('scale=' + dpi);
+
+  parameters = parameters.join('&');
+  return static_root + parameters;
+};
+
+GMaps.prototype.addMapType = function(mapTypeId, options) {
+  if (options.hasOwnProperty("getTileUrl") && typeof(options["getTileUrl"]) == "function") {
+    options.tileSize = options.tileSize || new google.maps.Size(256, 256);
+
+    var mapType = new google.maps.ImageMapType(options);
+
+    this.map.mapTypes.set(mapTypeId, mapType);
+  }
+  else {
+    throw "'getTileUrl' function required.";
+  }
+};
+
+GMaps.prototype.addOverlayMapType = function(options) {
+  if (options.hasOwnProperty("getTile") && typeof(options["getTile"]) == "function") {
+    var overlayMapTypeIndex = options.index;
+
+    delete options.index;
+
+    this.map.overlayMapTypes.insertAt(overlayMapTypeIndex, options);
+  }
+  else {
+    throw "'getTile' function required.";
+  }
+};
+
+GMaps.prototype.removeOverlayMapType = function(overlayMapTypeIndex) {
+  this.map.overlayMapTypes.removeAt(overlayMapTypeIndex);
+};
+
+GMaps.prototype.addStyle = function(options) {
+  var styledMapType = new google.maps.StyledMapType(options.styles, { name: options.styledMapName });
+
+  this.map.mapTypes.set(options.mapTypeId, styledMapType);
+};
+
+GMaps.prototype.setStyle = function(mapTypeId) {
+  this.map.setMapTypeId(mapTypeId);
+};
+
+GMaps.prototype.createPanorama = function(streetview_options) {
+  if (!streetview_options.hasOwnProperty('lat') || !streetview_options.hasOwnProperty('lng')) {
+    streetview_options.lat = this.getCenter().lat();
+    streetview_options.lng = this.getCenter().lng();
+  }
+
+  this.panorama = GMaps.createPanorama(streetview_options);
+
+  this.map.setStreetView(this.panorama);
+
+  return this.panorama;
+};
+
+GMaps.createPanorama = function(options) {
+  var el = getElementById(options.el, options.context);
+
+  options.position = new google.maps.LatLng(options.lat, options.lng);
+
+  delete options.el;
+  delete options.context;
+  delete options.lat;
+  delete options.lng;
+
+  var streetview_events = ['closeclick', 'links_changed', 'pano_changed', 'position_changed', 'pov_changed', 'resize', 'visible_changed'],
+      streetview_options = extend_object({visible : true}, options);
+
+  for (var i = 0; i < streetview_events.length; i++) {
+    delete streetview_options[streetview_events[i]];
+  }
+
+  var panorama = new google.maps.StreetViewPanorama(el, streetview_options);
+
+  for (var i = 0; i < streetview_events.length; i++) {
+    (function(object, name) {
+      if (options[name]) {
+        google.maps.event.addListener(object, name, function(){
+          options[name].apply(this);
+        });
+      }
+    })(panorama, streetview_events[i]);
+  }
+
+  return panorama;
+};
+
+GMaps.prototype.on = function(event_name, handler) {
+  return GMaps.on(event_name, this, handler);
+};
+
+GMaps.prototype.off = function(event_name) {
+  GMaps.off(event_name, this);
+};
+
+GMaps.prototype.once = function(event_name, handler) {
+  return GMaps.once(event_name, this, handler);
+};
+
+GMaps.custom_events = ['marker_added', 'marker_removed', 'polyline_added', 'polyline_removed', 'polygon_added', 'polygon_removed', 'geolocated', 'geolocation_failed'];
+
+GMaps.on = function(event_name, object, handler) {
+  if (GMaps.custom_events.indexOf(event_name) == -1) {
+    if(object instanceof GMaps) object = object.map; 
+    return google.maps.event.addListener(object, event_name, handler);
+  }
+  else {
+    var registered_event = {
+      handler : handler,
+      eventName : event_name
+    };
+
+    object.registered_events[event_name] = object.registered_events[event_name] || [];
+    object.registered_events[event_name].push(registered_event);
+
+    return registered_event;
+  }
+};
+
+GMaps.off = function(event_name, object) {
+  if (GMaps.custom_events.indexOf(event_name) == -1) {
+    if(object instanceof GMaps) object = object.map; 
+    google.maps.event.clearListeners(object, event_name);
+  }
+  else {
+    object.registered_events[event_name] = [];
+  }
+};
+
+GMaps.once = function(event_name, object, handler) {
+  if (GMaps.custom_events.indexOf(event_name) == -1) {
+    if(object instanceof GMaps) object = object.map;
+    return google.maps.event.addListenerOnce(object, event_name, handler);
+  }
+};
+
+GMaps.fire = function(event_name, object, scope) {
+  if (GMaps.custom_events.indexOf(event_name) == -1) {
+    google.maps.event.trigger(object, event_name, Array.prototype.slice.apply(arguments).slice(2));
+  }
+  else {
+    if(event_name in scope.registered_events) {
+      var firing_events = scope.registered_events[event_name];
+
+      for(var i = 0; i < firing_events.length; i++) {
+        (function(handler, scope, object) {
+          handler.apply(scope, [object]);
+        })(firing_events[i]['handler'], scope, object);
+      }
+    }
+  }
+};
+
+GMaps.geolocate = function(options) {
+  var complete_callback = options.always || options.complete;
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      options.success(position);
+
+      if (complete_callback) {
+        complete_callback();
+      }
+    }, function(error) {
+      options.error(error);
+
+      if (complete_callback) {
+        complete_callback();
+      }
+    }, options.options);
+  }
+  else {
+    options.not_supported();
+
+    if (complete_callback) {
+      complete_callback();
+    }
+  }
+};
+
+GMaps.geocode = function(options) {
+  this.geocoder = new google.maps.Geocoder();
+  var callback = options.callback;
+  if (options.hasOwnProperty('lat') && options.hasOwnProperty('lng')) {
+    options.latLng = new google.maps.LatLng(options.lat, options.lng);
+  }
+
+  delete options.lat;
+  delete options.lng;
+  delete options.callback;
+  
+  this.geocoder.geocode(options, function(results, status) {
+    callback(results, status);
+  });
+};
+
+if (typeof window.google === 'object' && window.google.maps) {
+  //==========================
+  // Polygon containsLatLng
+  // https://github.com/tparkin/Google-Maps-Point-in-Polygon
+  // Poygon getBounds extension - google-maps-extensions
+  // http://code.google.com/p/google-maps-extensions/source/browse/google.maps.Polygon.getBounds.js
+  if (!google.maps.Polygon.prototype.getBounds) {
+    google.maps.Polygon.prototype.getBounds = function(latLng) {
+      var bounds = new google.maps.LatLngBounds();
+      var paths = this.getPaths();
+      var path;
+
+      for (var p = 0; p < paths.getLength(); p++) {
+        path = paths.getAt(p);
+        for (var i = 0; i < path.getLength(); i++) {
+          bounds.extend(path.getAt(i));
+        }
+      }
+
+      return bounds;
+    };
+  }
+
+  if (!google.maps.Polygon.prototype.containsLatLng) {
+    // Polygon containsLatLng - method to determine if a latLng is within a polygon
+    google.maps.Polygon.prototype.containsLatLng = function(latLng) {
+      // Exclude points outside of bounds as there is no way they are in the poly
+      var bounds = this.getBounds();
+
+      if (bounds !== null && !bounds.contains(latLng)) {
+        return false;
+      }
+
+      // Raycast point in polygon method
+      var inPoly = false;
+
+      var numPaths = this.getPaths().getLength();
+      for (var p = 0; p < numPaths; p++) {
+        var path = this.getPaths().getAt(p);
+        var numPoints = path.getLength();
+        var j = numPoints - 1;
+
+        for (var i = 0; i < numPoints; i++) {
+          var vertex1 = path.getAt(i);
+          var vertex2 = path.getAt(j);
+
+          if (vertex1.lng() < latLng.lng() && vertex2.lng() >= latLng.lng() || vertex2.lng() < latLng.lng() && vertex1.lng() >= latLng.lng()) {
+            if (vertex1.lat() + (latLng.lng() - vertex1.lng()) / (vertex2.lng() - vertex1.lng()) * (vertex2.lat() - vertex1.lat()) < latLng.lat()) {
+              inPoly = !inPoly;
+            }
+          }
+
+          j = i;
+        }
+      }
+
+      return inPoly;
+    };
+  }
+
+  if (!google.maps.Circle.prototype.containsLatLng) {
+    google.maps.Circle.prototype.containsLatLng = function(latLng) {
+      if (google.maps.geometry) {
+        return google.maps.geometry.spherical.computeDistanceBetween(this.getCenter(), latLng) <= this.getRadius();
+      }
+      else {
+        return true;
+      }
+    };
+  }
+
+  google.maps.Rectangle.prototype.containsLatLng = function(latLng) {
+    return this.getBounds().contains(latLng);
+  };
+
+  google.maps.LatLngBounds.prototype.containsLatLng = function(latLng) {
+    return this.contains(latLng);
+  };
+
+  google.maps.Marker.prototype.setFences = function(fences) {
+    this.fences = fences;
+  };
+
+  google.maps.Marker.prototype.addFence = function(fence) {
+    this.fences.push(fence);
+  };
+
+  google.maps.Marker.prototype.getId = function() {
+    return this['__gm_id'];
+  };
+}
+
+//==========================
+// Array indexOf
+// https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Array/indexOf
+if (!Array.prototype.indexOf) {
+  Array.prototype.indexOf = function (searchElement /*, fromIndex */ ) {
+      "use strict";
+      if (this == null) {
+          throw new TypeError();
+      }
+      var t = Object(this);
+      var len = t.length >>> 0;
+      if (len === 0) {
+          return -1;
+      }
+      var n = 0;
+      if (arguments.length > 1) {
+          n = Number(arguments[1]);
+          if (n != n) { // shortcut for verifying if it's NaN
+              n = 0;
+          } else if (n != 0 && n != Infinity && n != -Infinity) {
+              n = (n > 0 || -1) * Math.floor(Math.abs(n));
+          }
+      }
+      if (n >= len) {
+          return -1;
+      }
+      var k = n >= 0 ? n : Math.max(len - Math.abs(n), 0);
+      for (; k < len; k++) {
+          if (k in t && t[k] === searchElement) {
+              return k;
+          }
+      }
+      return -1;
+  }
+}
+
+return GMaps;
+}));
+
+// Blocs.js Minified
+function setUpSpecialNavs() {
+    $(".navbar-toggle").click(function(t) {
+        var e = $(this).closest("nav"),
+            i = e.find("ul.site-navigation"),
+            a = i.clone();
+        if (i.parent().hasClass("nav-special"))
+            if (t.stopPropagation(), $(this).hasClass("selected-nav")) $(".blocsapp-special-menu blocsnav").removeClass("open"), $(".selected-nav").removeClass("selected-nav"), setTimeout(function() {
+                $(".blocsapp-special-menu").remove(), $("body").removeClass("lock-scroll"), $(".selected-nav").removeClass("selected-nav")
+            }, 300);
+            else {
+                $(this).addClass("selected-nav");
+                var o = e.attr("class").replace("navbar", "").replace("row", ""),
+                    l = i.parent().attr("class").replace("navbar-collapse", "").replace("collapse", "");
+                ($(".content-tint").length = -1) && $("body").append('<div class="content-tint"></div>'), a.insertBefore(".page-container").wrap('<div class="blocsapp-special-menu ' + o + '"><blocsnav class="' + l + '">'), $("blocsnav").prepend('<a class="close-special-menu animated fadeIn" style="animation-delay:0.5s;"><div class="close-icon"></div></a>'),
+                    function() {
+                        var t = "fadeInRight",
+                            e = 0,
+                            i = 60;
+                        $(".blocsapp-special-menu blocsnav").hasClass("fullscreen-nav") ? (t = "fadeIn", i = 100) : $(".blocsapp-special-menu").hasClass("nav-invert") && (t = "fadeInLeft");
+                        $(".blocsapp-special-menu blocsnav li").each(function() {
+                            $(this).parent().hasClass("dropdown-menu") ? $(this).addClass("animated fadeIn") : (e += i, $(this).attr("style", "animation-delay:" + e + "ms").addClass("animated " + t))
+                        })
+                    }(), setTimeout(function() {
+                        $(".blocsapp-special-menu blocsnav").addClass("open"), $(".content-tint").addClass("on"), $("body").addClass("lock-scroll")
+                    }, 10)
+            }
+    }), $("body").on("mousedown touchstart", ".content-tint, .close-special-menu", function(t) {
+        $(".content-tint").removeClass("on"), $(".selected-nav").click(), setTimeout(function() {
+            $(".content-tint").remove()
+        }, 10)
+    }).on("click", ".blocsapp-special-menu a", function(t) {
+        $(t.target).closest(".dropdown-toggle").length || $(".close-special-menu").mousedown()
+    })
+}
+
+function extraNavFuncs() {
+    $(".site-navigation a").click(function(t) {
+        $(t.target).closest(".dropdown-toggle").length || $(".navbar-collapse").collapse("hide")
+    }), $("a.dropdown-toggle").click(function(t) {
+        $(this).parent().addClass("target-open-menu"), $(this).closest(".dropdown-menu").find(".dropdown.open").each(function(t) {
+            $(this).hasClass("target-open-menu") || $(this).removeClass("open")
+        }), $(".target-open-menu").removeClass("target-open-menu")
+    })
+}
+
+function setFillScreenBlocHeight() {
+    $(".bloc-fill-screen").each(function(t) {
+        var e = $(this);
+        window.fillBodyHeight = 0, $(this).find(".container").each(function(t) {
+            fillPadding = 2 * parseInt($(this).css("padding-top")), e.hasClass("bloc-group") ? fillBodyHeight = fillPadding + $(this).outerHeight() + 50 : fillBodyHeight = fillBodyHeight + fillPadding + $(this).outerHeight() + 50
+        }), $(this).css("height", getFillHeight() + "px")
+    })
+}
+
+function getFillHeight() {
+    var t = $(window).height();
+    return t < fillBodyHeight && (t = fillBodyHeight + 100), t
+}
+
+function scrollToTarget(t) {
+    1 == t ? t = 0 : 2 == t ? t = $(document).height() : (t = $(t).offset().top, $(".sticky-nav").length && (t -= $(".sticky-nav .navbar-header").height())), $("html,body").animate({
+        scrollTop: t
+    }, "slow"), $(".navbar-collapse").collapse("hide")
+}
+
+function animateWhenVisible() {
+    hideAll(), inViewCheck(), $(window).scroll(function() {
+        inViewCheck(), scrollToTopView(), stickyNavToggle()
+    })
+}
+
+function setUpDropdownSubs() {
+    $("ul.dropdown-menu [data-toggle=dropdown]").on("click", function(t) {
+        t.preventDefault(), t.stopPropagation(), $(this).parent().siblings().removeClass("open"), $(this).parent().toggleClass("open");
+        var e = $(this).parent().children(".dropdown-menu");
+        e.offset().left + e.width() > $(window).width() && e.addClass("dropmenu-flow-right")
+    })
+}
+
+function stickyNavToggle() {
+    var t = 0,
+        e = "sticky";
+    if ($(".sticky-nav").hasClass("fill-bloc-top-edge")) {
+        var i = $(".fill-bloc-top-edge.sticky-nav").parent().css("background-color");
+        "rgba(0, 0, 0, 0)" == i && (i = "#FFFFFF"), $(".sticky-nav").css("background", i), t = $(".sticky-nav").height(), e = "sticky animated fadeInDown"
+    }
+    $(window).scrollTop() > t ? ($(".sticky-nav").addClass(e), "sticky" == e && $(".page-container").css("padding-top", $(".sticky-nav").height())) : ($(".sticky-nav").removeClass(e).removeAttr("style"), $(".page-container").removeAttr("style"))
+}
+
+function hideAll() {
+    $(".animated").each(function(t) {
+        $(this).closest(".hero").length || $(this).removeClass("animated").addClass("hideMe")
+    })
+}
+
+function inViewCheck() {
+    $($(".hideMe").get().reverse()).each(function(t) {
+        var e = jQuery(this),
+            i = e.offset().top + e.height(),
+            a = $(window).scrollTop() + $(window).height();
+        if (e.height() > $(window).height() && (i = e.offset().top), i < a) {
+            var o = e.attr("class").replace("hideMe", "animated");
+            e.css("visibility", "hidden").removeAttr("class"), setTimeout(function() {
+                e.attr("class", o).css("visibility", "visible")
+            }, .01)
+        }
+    })
+}
+
+function scrollToTopView() {
+    $(window).scrollTop() > $(window).height() / 3 ? $(".scrollToTop").hasClass("showScrollTop") || $(".scrollToTop").addClass("showScrollTop") : $(".scrollToTop").removeClass("showScrollTop")
+}
+
+function setUpVisibilityToggle() {
+    $(document).on("click", "[data-toggle-visibility]", function(t) {
+        t.preventDefault();
+        var e = $(this).attr("data-toggle-visibility");
+        if (-1 != e.indexOf(",")) {
+            var i = e.split(",");
+            $.each(i, function(t) {
+                a($("#" + i[t]))
+            })
+        } else a($("#" + e));
+
+        function a(t) {
+            t.is("img") ? t.toggle() : t.slideToggle()
+        }
+    })
+}
+
+function setUpLightBox() {
+    window.targetLightbox, $(document).on("click", "[data-lightbox]", function(t) {
+        t.preventDefault(), targetLightbox = $(this);
+        var e = targetLightbox.attr("data-lightbox"),
+            i = targetLightbox.attr("data-autoplay"),
+            a = '<p class="lightbox-caption">' + targetLightbox.attr("data-caption") + "</p>",
+            o = "no-gallery-set",
+            l = targetLightbox.attr("data-frame");
+        targetLightbox.attr("data-gallery-id") && (o = targetLightbox.attr("data-gallery-id")), targetLightbox.attr("data-caption") || (a = "");
+        var n = "";
+        1 == i && (n = "autoplay");
+        var s = $('<div id="lightbox-modal" class="modal fade"><div class="modal-dialog"><div class="modal-content ' + l + ' blocs-lb-container"><button id="blocs-lightbox-close-btn" type="button" class="close-lightbox" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><div class="modal-body"><a href="#" class="prev-lightbox" aria-label="prev"><span class="fa fa-chevron-left"></span></a><a href="#" class="next-lightbox" aria-label="next"><span class="fa fa-chevron-right"></span></a><img id="lightbox-image" class="img-responsive" src="' + e + '"><div id="lightbox-video-container" class="embed-responsive embed-responsive-16by9"><video controls ' + n + ' class="embed-responsive-item"><source id="lightbox-video" src="' + e + '" type="video/mp4"></video></div>' + a + "</div></div></div></div>");
+        $("body").append(s), "fullscreen-lb" == l && ($("#lightbox-modal").addClass("fullscreen-modal").append('<a class="close-full-screen-modal animated fadeIn" style="animation-delay:0.5s;" onclick="$(\'#lightbox-modal\').modal(\'hide\');"><div class="close-icon"></div></a>'), $("#blocs-lightbox-close-btn").remove()), ".mp4" == e.substring(e.length - 4) ? ($("#lightbox-image, .lightbox-caption").hide(), $("#lightbox-video-container").show()) : ($("#lightbox-image,.lightbox-caption").show(), $("#lightbox-video-container").hide()), $("#lightbox-modal").modal("show"), "no-gallery-set" == o ? (0 == $("a[data-lightbox]").index(targetLightbox) && $(".prev-lightbox").hide(), $("a[data-lightbox]").index(targetLightbox) == $("a[data-lightbox]").length - 1 && $(".next-lightbox").hide()) : (0 == $('a[data-gallery-id="' + o + '"]').index(targetLightbox) && $(".prev-lightbox").hide(), $('a[data-gallery-id="' + o + '"]').index(targetLightbox) == $('a[data-gallery-id="' + o + '"]').length - 1 && $(".next-lightbox").hide()), addLightBoxSwipeSupport()
+    }).on("hidden.bs.modal", "#lightbox-modal", function() {
+        $("#lightbox-modal").remove()
+    }), $(document).on("click", ".next-lightbox, .prev-lightbox", function(t) {
+        t.preventDefault();
+        var e = "no-gallery-set",
+            i = $("a[data-lightbox]").index(targetLightbox),
+            a = $("a[data-lightbox]").eq(i + 1);
+        targetLightbox.attr("data-gallery-id") && (e = targetLightbox.attr("data-gallery-id"), i = $('a[data-gallery-id="' + e + '"]').index(targetLightbox), a = $('a[data-gallery-id="' + e + '"]').eq(i + 1)), $(this).hasClass("prev-lightbox") && (a = $('a[data-gallery-id="' + e + '"]').eq(i - 1), "no-gallery-set" == e && (a = $("a[data-lightbox]").eq(i - 1)));
+        var o = a.attr("data-lightbox");
+        if (".mp4" == o.substring(o.length - 4)) {
+            var l = "";
+            1 == a.attr("data-autoplay") && (l = "autoplay"), $("#lightbox-image, .lightbox-caption").hide(), $("#lightbox-video-container").show().html("<video controls " + l + ' class="embed-responsive-item"><source id="lightbox-video" src="' + o + '" type="video/mp4"></video>')
+        } else $("#lightbox-image").attr("src", o).show(), $(".lightbox-caption").html(a.attr("data-caption")).show(), $("#lightbox-video-container").hide();
+        targetLightbox = a, $(".next-lightbox, .prev-lightbox").hide(), "no-gallery-set" == e ? ($("a[data-lightbox]").index(a) != $("a[data-lightbox]").length - 1 && $(".next-lightbox").show(), $("a[data-lightbox]").index(a) > 0 && $(".prev-lightbox").show()) : ($('a[data-gallery-id="' + e + '"]').index(a) != $('a[data-gallery-id="' + e + '"]').length - 1 && $(".next-lightbox").show(), $('a[data-gallery-id="' + e + '"]').index(a) > 0 && $(".prev-lightbox").show())
+    })
+}
+
+function addSwipeSupport() {
+    $(".carousel-inner").length && $(".carousel-inner").swipe({
+        swipeLeft: function(t, e, i, a, o) {
+            $(this).parent().carousel("next")
+        },
+        swipeRight: function() {
+            $(this).parent().carousel("prev")
+        },
+        threshold: 0
+    })
+}
+
+function addKeyBoardSupport() {
+    $(window).keydown(function(t) {
+        37 == t.which ? $(".prev-lightbox").is(":visible") && $(".prev-lightbox").click() : 39 == t.which && $(".next-lightbox").is(":visible") && $(".next-lightbox").click()
+    })
+}
+
+function addLightBoxSwipeSupport() {
+    $("#lightbox-image").length && $("#lightbox-image").swipe({
+        swipeLeft: function(t, e, i, a, o) {
+            $(".next-lightbox").is(":visible") && $(".next-lightbox").click()
+        },
+        swipeRight: function() {
+            $(".prev-lightbox").is(":visible") && $(".prev-lightbox").click()
+        },
+        threshold: 0
+    })
+}
+$(document).ready(function() {
+    $("#scroll-hero").click(function(t) {
+        t.preventDefault(), $("html,body").animate({
+            scrollTop: $("#scroll-hero").closest(".bloc").height()
+        }, "slow")
+    }), extraNavFuncs(), setUpSpecialNavs(), setUpDropdownSubs(), setUpLightBox(), setUpVisibilityToggle(), addSwipeSupport(), addKeyBoardSupport(), -1 != navigator.userAgent.indexOf("Safari") && -1 == navigator.userAgent.indexOf("Chrome") && $("#page-loading-blocs-notifaction").remove()
+}), $(window).load(function() {
+    setFillScreenBlocHeight(), animateWhenVisible(), $("#page-loading-blocs-notifaction").remove()
+}).resize(function() {
+    setFillScreenBlocHeight()
+}), $(function() {
+    $('[data-toggle="tooltip"]').tooltip()
+});
+
+
+/*!
+ * Bootstrap v3.3.5 (http://getbootstrap.com)
+ * Copyright 2011-2015 Twitter, Inc.
+ * Licensed under the MIT license
+ */
+if ("undefined" == typeof jQuery) throw new Error("Bootstrap's JavaScript requires jQuery"); + function(a) {
+    "use strict";
+    var b = a.fn.jquery.split(" ")[0].split(".");
+    if (b[0] < 2 && b[1] < 9 || 1 == b[0] && 9 == b[1] && b[2] < 1) throw new Error("Bootstrap's JavaScript requires jQuery version 1.9.1 or higher")
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b() {
+        var a = document.createElement("bootstrap"),
+            b = {
+                WebkitTransition: "webkitTransitionEnd",
+                MozTransition: "transitionend",
+                OTransition: "oTransitionEnd otransitionend",
+                transition: "transitionend"
+            };
+        for (var c in b)
+            if (void 0 !== a.style[c]) return {
+                end: b[c]
+            };
+        return !1
+    }
+    a.fn.emulateTransitionEnd = function(b) {
+        var c = !1,
+            d = this;
+        a(this).one("bsTransitionEnd", function() {
+            c = !0
+        });
+        var e = function() {
+            c || a(d).trigger(a.support.transition.end)
+        };
+        return setTimeout(e, b), this
+    }, a(function() {
+        a.support.transition = b(), a.support.transition && (a.event.special.bsTransitionEnd = {
+            bindType: a.support.transition.end,
+            delegateType: a.support.transition.end,
+            handle: function(b) {
+                return a(b.target).is(this) ? b.handleObj.handler.apply(this, arguments) : void 0
+            }
+        })
+    })
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b) {
+        return this.each(function() {
+            var c = a(this),
+                e = c.data("bs.alert");
+            e || c.data("bs.alert", e = new d(this)), "string" == typeof b && e[b].call(c)
+        })
+    }
+    var c = '[data-dismiss="alert"]',
+        d = function(b) {
+            a(b).on("click", c, this.close)
+        };
+    d.VERSION = "3.3.5", d.TRANSITION_DURATION = 150, d.prototype.close = function(b) {
+        function c() {
+            g.detach().trigger("closed.bs.alert").remove()
+        }
+        var e = a(this),
+            f = e.attr("data-target");
+        f || (f = e.attr("href"), f = f && f.replace(/.*(?=#[^\s]*$)/, ""));
+        var g = a(f);
+        b && b.preventDefault(), g.length || (g = e.closest(".alert")), g.trigger(b = a.Event("close.bs.alert")), b.isDefaultPrevented() || (g.removeClass("in"), a.support.transition && g.hasClass("fade") ? g.one("bsTransitionEnd", c).emulateTransitionEnd(d.TRANSITION_DURATION) : c())
+    };
+    var e = a.fn.alert;
+    a.fn.alert = b, a.fn.alert.Constructor = d, a.fn.alert.noConflict = function() {
+        return a.fn.alert = e, this
+    }, a(document).on("click.bs.alert.data-api", c, d.prototype.close)
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b) {
+        return this.each(function() {
+            var d = a(this),
+                e = d.data("bs.button"),
+                f = "object" == typeof b && b;
+            e || d.data("bs.button", e = new c(this, f)), "toggle" == b ? e.toggle() : b && e.setState(b)
+        })
+    }
+    var c = function(b, d) {
+        this.$element = a(b), this.options = a.extend({}, c.DEFAULTS, d), this.isLoading = !1
+    };
+    c.VERSION = "3.3.5", c.DEFAULTS = {
+        loadingText: "loading..."
+    }, c.prototype.setState = function(b) {
+        var c = "disabled",
+            d = this.$element,
+            e = d.is("input") ? "val" : "html",
+            f = d.data();
+        b += "Text", null == f.resetText && d.data("resetText", d[e]()), setTimeout(a.proxy(function() {
+            d[e](null == f[b] ? this.options[b] : f[b]), "loadingText" == b ? (this.isLoading = !0, d.addClass(c).attr(c, c)) : this.isLoading && (this.isLoading = !1, d.removeClass(c).removeAttr(c))
+        }, this), 0)
+    }, c.prototype.toggle = function() {
+        var a = !0,
+            b = this.$element.closest('[data-toggle="buttons"]');
+        if (b.length) {
+            var c = this.$element.find("input");
+            "radio" == c.prop("type") ? (c.prop("checked") && (a = !1), b.find(".active").removeClass("active"), this.$element.addClass("active")) : "checkbox" == c.prop("type") && (c.prop("checked") !== this.$element.hasClass("active") && (a = !1), this.$element.toggleClass("active")), c.prop("checked", this.$element.hasClass("active")), a && c.trigger("change")
+        } else this.$element.attr("aria-pressed", !this.$element.hasClass("active")), this.$element.toggleClass("active")
+    };
+    var d = a.fn.button;
+    a.fn.button = b, a.fn.button.Constructor = c, a.fn.button.noConflict = function() {
+        return a.fn.button = d, this
+    }, a(document).on("click.bs.button.data-api", '[data-toggle^="button"]', function(c) {
+        var d = a(c.target);
+        d.hasClass("btn") || (d = d.closest(".btn")), b.call(d, "toggle"), a(c.target).is('input[type="radio"]') || a(c.target).is('input[type="checkbox"]') || c.preventDefault()
+    }).on("focus.bs.button.data-api blur.bs.button.data-api", '[data-toggle^="button"]', function(b) {
+        a(b.target).closest(".btn").toggleClass("focus", /^focus(in)?$/.test(b.type))
+    })
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b) {
+        return this.each(function() {
+            var d = a(this),
+                e = d.data("bs.carousel"),
+                f = a.extend({}, c.DEFAULTS, d.data(), "object" == typeof b && b),
+                g = "string" == typeof b ? b : f.slide;
+            e || d.data("bs.carousel", e = new c(this, f)), "number" == typeof b ? e.to(b) : g ? e[g]() : f.interval && e.pause().cycle()
+        })
+    }
+    var c = function(b, c) {
+        this.$element = a(b), this.$indicators = this.$element.find(".carousel-indicators"), this.options = c, this.paused = null, this.sliding = null, this.interval = null, this.$active = null, this.$items = null, this.options.keyboard && this.$element.on("keydown.bs.carousel", a.proxy(this.keydown, this)), "hover" == this.options.pause && !("ontouchstart" in document.documentElement) && this.$element.on("mouseenter.bs.carousel", a.proxy(this.pause, this)).on("mouseleave.bs.carousel", a.proxy(this.cycle, this))
+    };
+    c.VERSION = "3.3.5", c.TRANSITION_DURATION = 600, c.DEFAULTS = {
+        interval: 5e3,
+        pause: "hover",
+        wrap: !0,
+        keyboard: !0
+    }, c.prototype.keydown = function(a) {
+        if (!/input|textarea/i.test(a.target.tagName)) {
+            switch (a.which) {
+                case 37:
+                    this.prev();
+                    break;
+                case 39:
+                    this.next();
+                    break;
+                default:
+                    return
+            }
+            a.preventDefault()
+        }
+    }, c.prototype.cycle = function(b) {
+        return b || (this.paused = !1), this.interval && clearInterval(this.interval), this.options.interval && !this.paused && (this.interval = setInterval(a.proxy(this.next, this), this.options.interval)), this
+    }, c.prototype.getItemIndex = function(a) {
+        return this.$items = a.parent().children(".item"), this.$items.index(a || this.$active)
+    }, c.prototype.getItemForDirection = function(a, b) {
+        var c = this.getItemIndex(b),
+            d = "prev" == a && 0 === c || "next" == a && c == this.$items.length - 1;
+        if (d && !this.options.wrap) return b;
+        var e = "prev" == a ? -1 : 1,
+            f = (c + e) % this.$items.length;
+        return this.$items.eq(f)
+    }, c.prototype.to = function(a) {
+        var b = this,
+            c = this.getItemIndex(this.$active = this.$element.find(".item.active"));
+        return a > this.$items.length - 1 || 0 > a ? void 0 : this.sliding ? this.$element.one("slid.bs.carousel", function() {
+            b.to(a)
+        }) : c == a ? this.pause().cycle() : this.slide(a > c ? "next" : "prev", this.$items.eq(a))
+    }, c.prototype.pause = function(b) {
+        return b || (this.paused = !0), this.$element.find(".next, .prev").length && a.support.transition && (this.$element.trigger(a.support.transition.end), this.cycle(!0)), this.interval = clearInterval(this.interval), this
+    }, c.prototype.next = function() {
+        return this.sliding ? void 0 : this.slide("next")
+    }, c.prototype.prev = function() {
+        return this.sliding ? void 0 : this.slide("prev")
+    }, c.prototype.slide = function(b, d) {
+        var e = this.$element.find(".item.active"),
+            f = d || this.getItemForDirection(b, e),
+            g = this.interval,
+            h = "next" == b ? "left" : "right",
+            i = this;
+        if (f.hasClass("active")) return this.sliding = !1;
+        var j = f[0],
+            k = a.Event("slide.bs.carousel", {
+                relatedTarget: j,
+                direction: h
+            });
+        if (this.$element.trigger(k), !k.isDefaultPrevented()) {
+            if (this.sliding = !0, g && this.pause(), this.$indicators.length) {
+                this.$indicators.find(".active").removeClass("active");
+                var l = a(this.$indicators.children()[this.getItemIndex(f)]);
+                l && l.addClass("active")
+            }
+            var m = a.Event("slid.bs.carousel", {
+                relatedTarget: j,
+                direction: h
+            });
+            return a.support.transition && this.$element.hasClass("slide") ? (f.addClass(b), f[0].offsetWidth, e.addClass(h), f.addClass(h), e.one("bsTransitionEnd", function() {
+                f.removeClass([b, h].join(" ")).addClass("active"), e.removeClass(["active", h].join(" ")), i.sliding = !1, setTimeout(function() {
+                    i.$element.trigger(m)
+                }, 0)
+            }).emulateTransitionEnd(c.TRANSITION_DURATION)) : (e.removeClass("active"), f.addClass("active"), this.sliding = !1, this.$element.trigger(m)), g && this.cycle(), this
+        }
+    };
+    var d = a.fn.carousel;
+    a.fn.carousel = b, a.fn.carousel.Constructor = c, a.fn.carousel.noConflict = function() {
+        return a.fn.carousel = d, this
+    };
+    var e = function(c) {
+        var d, e = a(this),
+            f = a(e.attr("data-target") || (d = e.attr("href")) && d.replace(/.*(?=#[^\s]+$)/, ""));
+        if (f.hasClass("carousel")) {
+            var g = a.extend({}, f.data(), e.data()),
+                h = e.attr("data-slide-to");
+            h && (g.interval = !1), b.call(f, g), h && f.data("bs.carousel").to(h), c.preventDefault()
+        }
+    };
+    a(document).on("click.bs.carousel.data-api", "[data-slide]", e).on("click.bs.carousel.data-api", "[data-slide-to]", e), a(window).on("load", function() {
+        a('[data-ride="carousel"]').each(function() {
+            var c = a(this);
+            b.call(c, c.data())
+        })
+    })
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b) {
+        var c, d = b.attr("data-target") || (c = b.attr("href")) && c.replace(/.*(?=#[^\s]+$)/, "");
+        return a(d)
+    }
+
+    function c(b) {
+        return this.each(function() {
+            var c = a(this),
+                e = c.data("bs.collapse"),
+                f = a.extend({}, d.DEFAULTS, c.data(), "object" == typeof b && b);
+            !e && f.toggle && /show|hide/.test(b) && (f.toggle = !1), e || c.data("bs.collapse", e = new d(this, f)), "string" == typeof b && e[b]()
+        })
+    }
+    var d = function(b, c) {
+        this.$element = a(b), this.options = a.extend({}, d.DEFAULTS, c), this.$trigger = a('[data-toggle="collapse"][href="#' + b.id + '"],[data-toggle="collapse"][data-target="#' + b.id + '"]'), this.transitioning = null, this.options.parent ? this.$parent = this.getParent() : this.addAriaAndCollapsedClass(this.$element, this.$trigger), this.options.toggle && this.toggle()
+    };
+    d.VERSION = "3.3.5", d.TRANSITION_DURATION = 350, d.DEFAULTS = {
+        toggle: !0
+    }, d.prototype.dimension = function() {
+        var a = this.$element.hasClass("width");
+        return a ? "width" : "height"
+    }, d.prototype.show = function() {
+        if (!this.transitioning && !this.$element.hasClass("in")) {
+            var b, e = this.$parent && this.$parent.children(".panel").children(".in, .collapsing");
+            if (!(e && e.length && (b = e.data("bs.collapse"), b && b.transitioning))) {
+                var f = a.Event("show.bs.collapse");
+                if (this.$element.trigger(f), !f.isDefaultPrevented()) {
+                    e && e.length && (c.call(e, "hide"), b || e.data("bs.collapse", null));
+                    var g = this.dimension();
+                    this.$element.removeClass("collapse").addClass("collapsing")[g](0).attr("aria-expanded", !0), this.$trigger.removeClass("collapsed").attr("aria-expanded", !0), this.transitioning = 1;
+                    var h = function() {
+                        this.$element.removeClass("collapsing").addClass("collapse in")[g](""), this.transitioning = 0, this.$element.trigger("shown.bs.collapse")
+                    };
+                    if (!a.support.transition) return h.call(this);
+                    var i = a.camelCase(["scroll", g].join("-"));
+                    this.$element.one("bsTransitionEnd", a.proxy(h, this)).emulateTransitionEnd(d.TRANSITION_DURATION)[g](this.$element[0][i])
+                }
+            }
+        }
+    }, d.prototype.hide = function() {
+        if (!this.transitioning && this.$element.hasClass("in")) {
+            var b = a.Event("hide.bs.collapse");
+            if (this.$element.trigger(b), !b.isDefaultPrevented()) {
+                var c = this.dimension();
+                this.$element[c](this.$element[c]())[0].offsetHeight, this.$element.addClass("collapsing").removeClass("collapse in").attr("aria-expanded", !1), this.$trigger.addClass("collapsed").attr("aria-expanded", !1), this.transitioning = 1;
+                var e = function() {
+                    this.transitioning = 0, this.$element.removeClass("collapsing").addClass("collapse").trigger("hidden.bs.collapse")
+                };
+                return a.support.transition ? void this.$element[c](0).one("bsTransitionEnd", a.proxy(e, this)).emulateTransitionEnd(d.TRANSITION_DURATION) : e.call(this)
+            }
+        }
+    }, d.prototype.toggle = function() {
+        this[this.$element.hasClass("in") ? "hide" : "show"]()
+    }, d.prototype.getParent = function() {
+        return a(this.options.parent).find('[data-toggle="collapse"][data-parent="' + this.options.parent + '"]').each(a.proxy(function(c, d) {
+            var e = a(d);
+            this.addAriaAndCollapsedClass(b(e), e)
+        }, this)).end()
+    }, d.prototype.addAriaAndCollapsedClass = function(a, b) {
+        var c = a.hasClass("in");
+        a.attr("aria-expanded", c), b.toggleClass("collapsed", !c).attr("aria-expanded", c)
+    };
+    var e = a.fn.collapse;
+    a.fn.collapse = c, a.fn.collapse.Constructor = d, a.fn.collapse.noConflict = function() {
+        return a.fn.collapse = e, this
+    }, a(document).on("click.bs.collapse.data-api", '[data-toggle="collapse"]', function(d) {
+        var e = a(this);
+        e.attr("data-target") || d.preventDefault();
+        var f = b(e),
+            g = f.data("bs.collapse"),
+            h = g ? "toggle" : e.data();
+        c.call(f, h)
+    })
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b) {
+        var c = b.attr("data-target");
+        c || (c = b.attr("href"), c = c && /#[A-Za-z]/.test(c) && c.replace(/.*(?=#[^\s]*$)/, ""));
+        var d = c && a(c);
+        return d && d.length ? d : b.parent()
+    }
+
+    function c(c) {
+        c && 3 === c.which || (a(e).remove(), a(f).each(function() {
+            var d = a(this),
+                e = b(d),
+                f = {
+                    relatedTarget: this
+                };
+            e.hasClass("open") && (c && "click" == c.type && /input|textarea/i.test(c.target.tagName) && a.contains(e[0], c.target) || (e.trigger(c = a.Event("hide.bs.dropdown", f)), c.isDefaultPrevented() || (d.attr("aria-expanded", "false"), e.removeClass("open").trigger("hidden.bs.dropdown", f))))
+        }))
+    }
+
+    function d(b) {
+        return this.each(function() {
+            var c = a(this),
+                d = c.data("bs.dropdown");
+            d || c.data("bs.dropdown", d = new g(this)), "string" == typeof b && d[b].call(c)
+        })
+    }
+    var e = ".dropdown-backdrop",
+        f = '[data-toggle="dropdown"]',
+        g = function(b) {
+            a(b).on("click.bs.dropdown", this.toggle)
+        };
+    g.VERSION = "3.3.5", g.prototype.toggle = function(d) {
+        var e = a(this);
+        if (!e.is(".disabled, :disabled")) {
+            var f = b(e),
+                g = f.hasClass("open");
+            if (c(), !g) {
+                "ontouchstart" in document.documentElement && !f.closest(".navbar-nav").length && a(document.createElement("div")).addClass("dropdown-backdrop").insertAfter(a(this)).on("click", c);
+                var h = {
+                    relatedTarget: this
+                };
+                if (f.trigger(d = a.Event("show.bs.dropdown", h)), d.isDefaultPrevented()) return;
+                e.trigger("focus").attr("aria-expanded", "true"), f.toggleClass("open").trigger("shown.bs.dropdown", h)
+            }
+            return !1
+        }
+    }, g.prototype.keydown = function(c) {
+        if (/(38|40|27|32)/.test(c.which) && !/input|textarea/i.test(c.target.tagName)) {
+            var d = a(this);
+            if (c.preventDefault(), c.stopPropagation(), !d.is(".disabled, :disabled")) {
+                var e = b(d),
+                    g = e.hasClass("open");
+                if (!g && 27 != c.which || g && 27 == c.which) return 27 == c.which && e.find(f).trigger("focus"), d.trigger("click");
+                var h = " li:not(.disabled):visible a",
+                    i = e.find(".dropdown-menu" + h);
+                if (i.length) {
+                    var j = i.index(c.target);
+                    38 == c.which && j > 0 && j--, 40 == c.which && j < i.length - 1 && j++, ~j || (j = 0), i.eq(j).trigger("focus")
+                }
+            }
+        }
+    };
+    var h = a.fn.dropdown;
+    a.fn.dropdown = d, a.fn.dropdown.Constructor = g, a.fn.dropdown.noConflict = function() {
+        return a.fn.dropdown = h, this
+    }, a(document).on("click.bs.dropdown.data-api", c).on("click.bs.dropdown.data-api", ".dropdown form", function(a) {
+        a.stopPropagation()
+    }).on("click.bs.dropdown.data-api", f, g.prototype.toggle).on("keydown.bs.dropdown.data-api", f, g.prototype.keydown).on("keydown.bs.dropdown.data-api", ".dropdown-menu", g.prototype.keydown)
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b, d) {
+        return this.each(function() {
+            var e = a(this),
+                f = e.data("bs.modal"),
+                g = a.extend({}, c.DEFAULTS, e.data(), "object" == typeof b && b);
+            f || e.data("bs.modal", f = new c(this, g)), "string" == typeof b ? f[b](d) : g.show && f.show(d)
+        })
+    }
+    var c = function(b, c) {
+        this.options = c, this.$body = a(document.body), this.$element = a(b), this.$dialog = this.$element.find(".modal-dialog"), this.$backdrop = null, this.isShown = null, this.originalBodyPad = null, this.scrollbarWidth = 0, this.ignoreBackdropClick = !1, this.options.remote && this.$element.find(".modal-content").load(this.options.remote, a.proxy(function() {
+            this.$element.trigger("loaded.bs.modal")
+        }, this))
+    };
+    c.VERSION = "3.3.5", c.TRANSITION_DURATION = 300, c.BACKDROP_TRANSITION_DURATION = 150, c.DEFAULTS = {
+        backdrop: !0,
+        keyboard: !0,
+        show: !0
+    }, c.prototype.toggle = function(a) {
+        return this.isShown ? this.hide() : this.show(a)
+    }, c.prototype.show = function(b) {
+        var d = this,
+            e = a.Event("show.bs.modal", {
+                relatedTarget: b
+            });
+        this.$element.trigger(e), this.isShown || e.isDefaultPrevented() || (this.isShown = !0, this.checkScrollbar(), this.setScrollbar(), this.$body.addClass("modal-open"), this.escape(), this.resize(), this.$element.on("click.dismiss.bs.modal", '[data-dismiss="modal"]', a.proxy(this.hide, this)), this.$dialog.on("mousedown.dismiss.bs.modal", function() {
+            d.$element.one("mouseup.dismiss.bs.modal", function(b) {
+                a(b.target).is(d.$element) && (d.ignoreBackdropClick = !0)
+            })
+        }), this.backdrop(function() {
+            var e = a.support.transition && d.$element.hasClass("fade");
+            d.$element.parent().length || d.$element.appendTo(d.$body), d.$element.show().scrollTop(0), d.adjustDialog(), e && d.$element[0].offsetWidth, d.$element.addClass("in"), d.enforceFocus();
+            var f = a.Event("shown.bs.modal", {
+                relatedTarget: b
+            });
+            e ? d.$dialog.one("bsTransitionEnd", function() {
+                d.$element.trigger("focus").trigger(f)
+            }).emulateTransitionEnd(c.TRANSITION_DURATION) : d.$element.trigger("focus").trigger(f)
+        }))
+    }, c.prototype.hide = function(b) {
+        b && b.preventDefault(), b = a.Event("hide.bs.modal"), this.$element.trigger(b), this.isShown && !b.isDefaultPrevented() && (this.isShown = !1, this.escape(), this.resize(), a(document).off("focusin.bs.modal"), this.$element.removeClass("in").off("click.dismiss.bs.modal").off("mouseup.dismiss.bs.modal"), this.$dialog.off("mousedown.dismiss.bs.modal"), a.support.transition && this.$element.hasClass("fade") ? this.$element.one("bsTransitionEnd", a.proxy(this.hideModal, this)).emulateTransitionEnd(c.TRANSITION_DURATION) : this.hideModal())
+    }, c.prototype.enforceFocus = function() {
+        a(document).off("focusin.bs.modal").on("focusin.bs.modal", a.proxy(function(a) {
+            this.$element[0] === a.target || this.$element.has(a.target).length || this.$element.trigger("focus")
+        }, this))
+    }, c.prototype.escape = function() {
+        this.isShown && this.options.keyboard ? this.$element.on("keydown.dismiss.bs.modal", a.proxy(function(a) {
+            27 == a.which && this.hide()
+        }, this)) : this.isShown || this.$element.off("keydown.dismiss.bs.modal")
+    }, c.prototype.resize = function() {
+        this.isShown ? a(window).on("resize.bs.modal", a.proxy(this.handleUpdate, this)) : a(window).off("resize.bs.modal")
+    }, c.prototype.hideModal = function() {
+        var a = this;
+        this.$element.hide(), this.backdrop(function() {
+            a.$body.removeClass("modal-open"), a.resetAdjustments(), a.resetScrollbar(), a.$element.trigger("hidden.bs.modal")
+        })
+    }, c.prototype.removeBackdrop = function() {
+        this.$backdrop && this.$backdrop.remove(), this.$backdrop = null
+    }, c.prototype.backdrop = function(b) {
+        var d = this,
+            e = this.$element.hasClass("fade") ? "fade" : "";
+        if (this.isShown && this.options.backdrop) {
+            var f = a.support.transition && e;
+            if (this.$backdrop = a(document.createElement("div")).addClass("modal-backdrop " + e).appendTo(this.$body), this.$element.on("click.dismiss.bs.modal", a.proxy(function(a) {
+                    return this.ignoreBackdropClick ? void(this.ignoreBackdropClick = !1) : void(a.target === a.currentTarget && ("static" == this.options.backdrop ? this.$element[0].focus() : this.hide()))
+                }, this)), f && this.$backdrop[0].offsetWidth, this.$backdrop.addClass("in"), !b) return;
+            f ? this.$backdrop.one("bsTransitionEnd", b).emulateTransitionEnd(c.BACKDROP_TRANSITION_DURATION) : b()
+        } else if (!this.isShown && this.$backdrop) {
+            this.$backdrop.removeClass("in");
+            var g = function() {
+                d.removeBackdrop(), b && b()
+            };
+            a.support.transition && this.$element.hasClass("fade") ? this.$backdrop.one("bsTransitionEnd", g).emulateTransitionEnd(c.BACKDROP_TRANSITION_DURATION) : g()
+        } else b && b()
+    }, c.prototype.handleUpdate = function() {
+        this.adjustDialog()
+    }, c.prototype.adjustDialog = function() {
+        var a = this.$element[0].scrollHeight > document.documentElement.clientHeight;
+        this.$element.css({
+            paddingLeft: !this.bodyIsOverflowing && a ? this.scrollbarWidth : "",
+            paddingRight: this.bodyIsOverflowing && !a ? this.scrollbarWidth : ""
+        })
+    }, c.prototype.resetAdjustments = function() {
+        this.$element.css({
+            paddingLeft: "",
+            paddingRight: ""
+        })
+    }, c.prototype.checkScrollbar = function() {
+        var a = window.innerWidth;
+        if (!a) {
+            var b = document.documentElement.getBoundingClientRect();
+            a = b.right - Math.abs(b.left)
+        }
+        this.bodyIsOverflowing = document.body.clientWidth < a, this.scrollbarWidth = this.measureScrollbar()
+    }, c.prototype.setScrollbar = function() {
+        var a = parseInt(this.$body.css("padding-right") || 0, 10);
+        this.originalBodyPad = document.body.style.paddingRight || "", this.bodyIsOverflowing && this.$body.css("padding-right", a + this.scrollbarWidth)
+    }, c.prototype.resetScrollbar = function() {
+        this.$body.css("padding-right", this.originalBodyPad)
+    }, c.prototype.measureScrollbar = function() {
+        var a = document.createElement("div");
+        a.className = "modal-scrollbar-measure", this.$body.append(a);
+        var b = a.offsetWidth - a.clientWidth;
+        return this.$body[0].removeChild(a), b
+    };
+    var d = a.fn.modal;
+    a.fn.modal = b, a.fn.modal.Constructor = c, a.fn.modal.noConflict = function() {
+        return a.fn.modal = d, this
+    }, a(document).on("click.bs.modal.data-api", '[data-toggle="modal"]', function(c) {
+        var d = a(this),
+            e = d.attr("href"),
+            f = a(d.attr("data-target") || e && e.replace(/.*(?=#[^\s]+$)/, "")),
+            g = f.data("bs.modal") ? "toggle" : a.extend({
+                remote: !/#/.test(e) && e
+            }, f.data(), d.data());
+        d.is("a") && c.preventDefault(), f.one("show.bs.modal", function(a) {
+            a.isDefaultPrevented() || f.one("hidden.bs.modal", function() {
+                d.is(":visible") && d.trigger("focus")
+            })
+        }), b.call(f, g, this)
+    })
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b) {
+        return this.each(function() {
+            var d = a(this),
+                e = d.data("bs.tooltip"),
+                f = "object" == typeof b && b;
+            (e || !/destroy|hide/.test(b)) && (e || d.data("bs.tooltip", e = new c(this, f)), "string" == typeof b && e[b]())
+        })
+    }
+    var c = function(a, b) {
+        this.type = null, this.options = null, this.enabled = null, this.timeout = null, this.hoverState = null, this.$element = null, this.inState = null, this.init("tooltip", a, b)
+    };
+    c.VERSION = "3.3.5", c.TRANSITION_DURATION = 150, c.DEFAULTS = {
+        animation: !0,
+        placement: "top",
+        selector: !1,
+        template: '<div class="tooltip" role="tooltip"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>',
+        trigger: "hover focus",
+        title: "",
+        delay: 0,
+        html: !1,
+        container: !1,
+        viewport: {
+            selector: "body",
+            padding: 0
+        }
+    }, c.prototype.init = function(b, c, d) {
+        if (this.enabled = !0, this.type = b, this.$element = a(c), this.options = this.getOptions(d), this.$viewport = this.options.viewport && a(a.isFunction(this.options.viewport) ? this.options.viewport.call(this, this.$element) : this.options.viewport.selector || this.options.viewport), this.inState = {
+                click: !1,
+                hover: !1,
+                focus: !1
+            }, this.$element[0] instanceof document.constructor && !this.options.selector) throw new Error("`selector` option must be specified when initializing " + this.type + " on the window.document object!");
+        for (var e = this.options.trigger.split(" "), f = e.length; f--;) {
+            var g = e[f];
+            if ("click" == g) this.$element.on("click." + this.type, this.options.selector, a.proxy(this.toggle, this));
+            else if ("manual" != g) {
+                var h = "hover" == g ? "mouseenter" : "focusin",
+                    i = "hover" == g ? "mouseleave" : "focusout";
+                this.$element.on(h + "." + this.type, this.options.selector, a.proxy(this.enter, this)), this.$element.on(i + "." + this.type, this.options.selector, a.proxy(this.leave, this))
+            }
+        }
+        this.options.selector ? this._options = a.extend({}, this.options, {
+            trigger: "manual",
+            selector: ""
+        }) : this.fixTitle()
+    }, c.prototype.getDefaults = function() {
+        return c.DEFAULTS
+    }, c.prototype.getOptions = function(b) {
+        return b = a.extend({}, this.getDefaults(), this.$element.data(), b), b.delay && "number" == typeof b.delay && (b.delay = {
+            show: b.delay,
+            hide: b.delay
+        }), b
+    }, c.prototype.getDelegateOptions = function() {
+        var b = {},
+            c = this.getDefaults();
+        return this._options && a.each(this._options, function(a, d) {
+            c[a] != d && (b[a] = d)
+        }), b
+    }, c.prototype.enter = function(b) {
+        var c = b instanceof this.constructor ? b : a(b.currentTarget).data("bs." + this.type);
+        return c || (c = new this.constructor(b.currentTarget, this.getDelegateOptions()), a(b.currentTarget).data("bs." + this.type, c)), b instanceof a.Event && (c.inState["focusin" == b.type ? "focus" : "hover"] = !0), c.tip().hasClass("in") || "in" == c.hoverState ? void(c.hoverState = "in") : (clearTimeout(c.timeout), c.hoverState = "in", c.options.delay && c.options.delay.show ? void(c.timeout = setTimeout(function() {
+            "in" == c.hoverState && c.show()
+        }, c.options.delay.show)) : c.show())
+    }, c.prototype.isInStateTrue = function() {
+        for (var a in this.inState)
+            if (this.inState[a]) return !0;
+        return !1
+    }, c.prototype.leave = function(b) {
+        var c = b instanceof this.constructor ? b : a(b.currentTarget).data("bs." + this.type);
+        return c || (c = new this.constructor(b.currentTarget, this.getDelegateOptions()), a(b.currentTarget).data("bs." + this.type, c)), b instanceof a.Event && (c.inState["focusout" == b.type ? "focus" : "hover"] = !1), c.isInStateTrue() ? void 0 : (clearTimeout(c.timeout), c.hoverState = "out", c.options.delay && c.options.delay.hide ? void(c.timeout = setTimeout(function() {
+            "out" == c.hoverState && c.hide()
+        }, c.options.delay.hide)) : c.hide())
+    }, c.prototype.show = function() {
+        var b = a.Event("show.bs." + this.type);
+        if (this.hasContent() && this.enabled) {
+            this.$element.trigger(b);
+            var d = a.contains(this.$element[0].ownerDocument.documentElement, this.$element[0]);
+            if (b.isDefaultPrevented() || !d) return;
+            var e = this,
+                f = this.tip(),
+                g = this.getUID(this.type);
+            this.setContent(), f.attr("id", g), this.$element.attr("aria-describedby", g), this.options.animation && f.addClass("fade");
+            var h = "function" == typeof this.options.placement ? this.options.placement.call(this, f[0], this.$element[0]) : this.options.placement,
+                i = /\s?auto?\s?/i,
+                j = i.test(h);
+            j && (h = h.replace(i, "") || "top"), f.detach().css({
+                top: 0,
+                left: 0,
+                display: "block"
+            }).addClass(h).data("bs." + this.type, this), this.options.container ? f.appendTo(this.options.container) : f.insertAfter(this.$element), this.$element.trigger("inserted.bs." + this.type);
+            var k = this.getPosition(),
+                l = f[0].offsetWidth,
+                m = f[0].offsetHeight;
+            if (j) {
+                var n = h,
+                    o = this.getPosition(this.$viewport);
+                h = "bottom" == h && k.bottom + m > o.bottom ? "top" : "top" == h && k.top - m < o.top ? "bottom" : "right" == h && k.right + l > o.width ? "left" : "left" == h && k.left - l < o.left ? "right" : h, f.removeClass(n).addClass(h)
+            }
+            var p = this.getCalculatedOffset(h, k, l, m);
+            this.applyPlacement(p, h);
+            var q = function() {
+                var a = e.hoverState;
+                e.$element.trigger("shown.bs." + e.type), e.hoverState = null, "out" == a && e.leave(e)
+            };
+            a.support.transition && this.$tip.hasClass("fade") ? f.one("bsTransitionEnd", q).emulateTransitionEnd(c.TRANSITION_DURATION) : q()
+        }
+    }, c.prototype.applyPlacement = function(b, c) {
+        var d = this.tip(),
+            e = d[0].offsetWidth,
+            f = d[0].offsetHeight,
+            g = parseInt(d.css("margin-top"), 10),
+            h = parseInt(d.css("margin-left"), 10);
+        isNaN(g) && (g = 0), isNaN(h) && (h = 0), b.top += g, b.left += h, a.offset.setOffset(d[0], a.extend({
+            using: function(a) {
+                d.css({
+                    top: Math.round(a.top),
+                    left: Math.round(a.left)
+                })
+            }
+        }, b), 0), d.addClass("in");
+        var i = d[0].offsetWidth,
+            j = d[0].offsetHeight;
+        "top" == c && j != f && (b.top = b.top + f - j);
+        var k = this.getViewportAdjustedDelta(c, b, i, j);
+        k.left ? b.left += k.left : b.top += k.top;
+        var l = /top|bottom/.test(c),
+            m = l ? 2 * k.left - e + i : 2 * k.top - f + j,
+            n = l ? "offsetWidth" : "offsetHeight";
+        d.offset(b), this.replaceArrow(m, d[0][n], l)
+    }, c.prototype.replaceArrow = function(a, b, c) {
+        this.arrow().css(c ? "left" : "top", 50 * (1 - a / b) + "%").css(c ? "top" : "left", "")
+    }, c.prototype.setContent = function() {
+        var a = this.tip(),
+            b = this.getTitle();
+        a.find(".tooltip-inner")[this.options.html ? "html" : "text"](b), a.removeClass("fade in top bottom left right")
+    }, c.prototype.hide = function(b) {
+        function d() {
+            "in" != e.hoverState && f.detach(), e.$element.removeAttr("aria-describedby").trigger("hidden.bs." + e.type), b && b()
+        }
+        var e = this,
+            f = a(this.$tip),
+            g = a.Event("hide.bs." + this.type);
+        return this.$element.trigger(g), g.isDefaultPrevented() ? void 0 : (f.removeClass("in"), a.support.transition && f.hasClass("fade") ? f.one("bsTransitionEnd", d).emulateTransitionEnd(c.TRANSITION_DURATION) : d(), this.hoverState = null, this)
+    }, c.prototype.fixTitle = function() {
+        var a = this.$element;
+        (a.attr("title") || "string" != typeof a.attr("data-original-title")) && a.attr("data-original-title", a.attr("title") || "").attr("title", "")
+    }, c.prototype.hasContent = function() {
+        return this.getTitle()
+    }, c.prototype.getPosition = function(b) {
+        b = b || this.$element;
+        var c = b[0],
+            d = "BODY" == c.tagName,
+            e = c.getBoundingClientRect();
+        null == e.width && (e = a.extend({}, e, {
+            width: e.right - e.left,
+            height: e.bottom - e.top
+        }));
+        var f = d ? {
+                top: 0,
+                left: 0
+            } : b.offset(),
+            g = {
+                scroll: d ? document.documentElement.scrollTop || document.body.scrollTop : b.scrollTop()
+            },
+            h = d ? {
+                width: a(window).width(),
+                height: a(window).height()
+            } : null;
+        return a.extend({}, e, g, h, f)
+    }, c.prototype.getCalculatedOffset = function(a, b, c, d) {
+        return "bottom" == a ? {
+            top: b.top + b.height,
+            left: b.left + b.width / 2 - c / 2
+        } : "top" == a ? {
+            top: b.top - d,
+            left: b.left + b.width / 2 - c / 2
+        } : "left" == a ? {
+            top: b.top + b.height / 2 - d / 2,
+            left: b.left - c
+        } : {
+            top: b.top + b.height / 2 - d / 2,
+            left: b.left + b.width
+        }
+    }, c.prototype.getViewportAdjustedDelta = function(a, b, c, d) {
+        var e = {
+            top: 0,
+            left: 0
+        };
+        if (!this.$viewport) return e;
+        var f = this.options.viewport && this.options.viewport.padding || 0,
+            g = this.getPosition(this.$viewport);
+        if (/right|left/.test(a)) {
+            var h = b.top - f - g.scroll,
+                i = b.top + f - g.scroll + d;
+            h < g.top ? e.top = g.top - h : i > g.top + g.height && (e.top = g.top + g.height - i)
+        } else {
+            var j = b.left - f,
+                k = b.left + f + c;
+            j < g.left ? e.left = g.left - j : k > g.right && (e.left = g.left + g.width - k)
+        }
+        return e
+    }, c.prototype.getTitle = function() {
+        var a, b = this.$element,
+            c = this.options;
+        return a = b.attr("data-original-title") || ("function" == typeof c.title ? c.title.call(b[0]) : c.title)
+    }, c.prototype.getUID = function(a) {
+        do a += ~~(1e6 * Math.random()); while (document.getElementById(a));
+        return a
+    }, c.prototype.tip = function() {
+        if (!this.$tip && (this.$tip = a(this.options.template), 1 != this.$tip.length)) throw new Error(this.type + " `template` option must consist of exactly 1 top-level element!");
+        return this.$tip
+    }, c.prototype.arrow = function() {
+        return this.$arrow = this.$arrow || this.tip().find(".tooltip-arrow")
+    }, c.prototype.enable = function() {
+        this.enabled = !0
+    }, c.prototype.disable = function() {
+        this.enabled = !1
+    }, c.prototype.toggleEnabled = function() {
+        this.enabled = !this.enabled
+    }, c.prototype.toggle = function(b) {
+        var c = this;
+        b && (c = a(b.currentTarget).data("bs." + this.type), c || (c = new this.constructor(b.currentTarget, this.getDelegateOptions()), a(b.currentTarget).data("bs." + this.type, c))), b ? (c.inState.click = !c.inState.click, c.isInStateTrue() ? c.enter(c) : c.leave(c)) : c.tip().hasClass("in") ? c.leave(c) : c.enter(c)
+    }, c.prototype.destroy = function() {
+        var a = this;
+        clearTimeout(this.timeout), this.hide(function() {
+            a.$element.off("." + a.type).removeData("bs." + a.type), a.$tip && a.$tip.detach(), a.$tip = null, a.$arrow = null, a.$viewport = null
+        })
+    };
+    var d = a.fn.tooltip;
+    a.fn.tooltip = b, a.fn.tooltip.Constructor = c, a.fn.tooltip.noConflict = function() {
+        return a.fn.tooltip = d, this
+    }
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b) {
+        return this.each(function() {
+            var d = a(this),
+                e = d.data("bs.popover"),
+                f = "object" == typeof b && b;
+            (e || !/destroy|hide/.test(b)) && (e || d.data("bs.popover", e = new c(this, f)), "string" == typeof b && e[b]())
+        })
+    }
+    var c = function(a, b) {
+        this.init("popover", a, b)
+    };
+    if (!a.fn.tooltip) throw new Error("Popover requires tooltip.js");
+    c.VERSION = "3.3.5", c.DEFAULTS = a.extend({}, a.fn.tooltip.Constructor.DEFAULTS, {
+        placement: "right",
+        trigger: "click",
+        content: "",
+        template: '<div class="popover" role="tooltip"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>'
+    }), c.prototype = a.extend({}, a.fn.tooltip.Constructor.prototype), c.prototype.constructor = c, c.prototype.getDefaults = function() {
+        return c.DEFAULTS
+    }, c.prototype.setContent = function() {
+        var a = this.tip(),
+            b = this.getTitle(),
+            c = this.getContent();
+        a.find(".popover-title")[this.options.html ? "html" : "text"](b), a.find(".popover-content").children().detach().end()[this.options.html ? "string" == typeof c ? "html" : "append" : "text"](c), a.removeClass("fade top bottom left right in"), a.find(".popover-title").html() || a.find(".popover-title").hide()
+    }, c.prototype.hasContent = function() {
+        return this.getTitle() || this.getContent()
+    }, c.prototype.getContent = function() {
+        var a = this.$element,
+            b = this.options;
+        return a.attr("data-content") || ("function" == typeof b.content ? b.content.call(a[0]) : b.content)
+    }, c.prototype.arrow = function() {
+        return this.$arrow = this.$arrow || this.tip().find(".arrow")
+    };
+    var d = a.fn.popover;
+    a.fn.popover = b, a.fn.popover.Constructor = c, a.fn.popover.noConflict = function() {
+        return a.fn.popover = d, this
+    }
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(c, d) {
+        this.$body = a(document.body), this.$scrollElement = a(a(c).is(document.body) ? window : c), this.options = a.extend({}, b.DEFAULTS, d), this.selector = (this.options.target || "") + " .nav li > a", this.offsets = [], this.targets = [], this.activeTarget = null, this.scrollHeight = 0, this.$scrollElement.on("scroll.bs.scrollspy", a.proxy(this.process, this)), this.refresh(), this.process()
+    }
+
+    function c(c) {
+        return this.each(function() {
+            var d = a(this),
+                e = d.data("bs.scrollspy"),
+                f = "object" == typeof c && c;
+            e || d.data("bs.scrollspy", e = new b(this, f)), "string" == typeof c && e[c]()
+        })
+    }
+    b.VERSION = "3.3.5", b.DEFAULTS = {
+        offset: 10
+    }, b.prototype.getScrollHeight = function() {
+        return this.$scrollElement[0].scrollHeight || Math.max(this.$body[0].scrollHeight, document.documentElement.scrollHeight)
+    }, b.prototype.refresh = function() {
+        var b = this,
+            c = "offset",
+            d = 0;
+        this.offsets = [], this.targets = [], this.scrollHeight = this.getScrollHeight(), a.isWindow(this.$scrollElement[0]) || (c = "position", d = this.$scrollElement.scrollTop()), this.$body.find(this.selector).map(function() {
+            var b = a(this),
+                e = b.data("target") || b.attr("href"),
+                f = /^#./.test(e) && a(e);
+            return f && f.length && f.is(":visible") && [
+                [f[c]().top + d, e]
+            ] || null
+        }).sort(function(a, b) {
+            return a[0] - b[0]
+        }).each(function() {
+            b.offsets.push(this[0]), b.targets.push(this[1])
+        })
+    }, b.prototype.process = function() {
+        var a, b = this.$scrollElement.scrollTop() + this.options.offset,
+            c = this.getScrollHeight(),
+            d = this.options.offset + c - this.$scrollElement.height(),
+            e = this.offsets,
+            f = this.targets,
+            g = this.activeTarget;
+        if (this.scrollHeight != c && this.refresh(), b >= d) return g != (a = f[f.length - 1]) && this.activate(a);
+        if (g && b < e[0]) return this.activeTarget = null, this.clear();
+        for (a = e.length; a--;) g != f[a] && b >= e[a] && (void 0 === e[a + 1] || b < e[a + 1]) && this.activate(f[a])
+    }, b.prototype.activate = function(b) {
+        this.activeTarget = b, this.clear();
+        var c = this.selector + '[data-target="' + b + '"],' + this.selector + '[href="' + b + '"]',
+            d = a(c).parents("li").addClass("active");
+        d.parent(".dropdown-menu").length && (d = d.closest("li.dropdown").addClass("active")),
+            d.trigger("activate.bs.scrollspy")
+    }, b.prototype.clear = function() {
+        a(this.selector).parentsUntil(this.options.target, ".active").removeClass("active")
+    };
+    var d = a.fn.scrollspy;
+    a.fn.scrollspy = c, a.fn.scrollspy.Constructor = b, a.fn.scrollspy.noConflict = function() {
+        return a.fn.scrollspy = d, this
+    }, a(window).on("load.bs.scrollspy.data-api", function() {
+        a('[data-spy="scroll"]').each(function() {
+            var b = a(this);
+            c.call(b, b.data())
+        })
+    })
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b) {
+        return this.each(function() {
+            var d = a(this),
+                e = d.data("bs.tab");
+            e || d.data("bs.tab", e = new c(this)), "string" == typeof b && e[b]()
+        })
+    }
+    var c = function(b) {
+        this.element = a(b)
+    };
+    c.VERSION = "3.3.5", c.TRANSITION_DURATION = 150, c.prototype.show = function() {
+        var b = this.element,
+            c = b.closest("ul:not(.dropdown-menu)"),
+            d = b.data("target");
+        if (d || (d = b.attr("href"), d = d && d.replace(/.*(?=#[^\s]*$)/, "")), !b.parent("li").hasClass("active")) {
+            var e = c.find(".active:last a"),
+                f = a.Event("hide.bs.tab", {
+                    relatedTarget: b[0]
+                }),
+                g = a.Event("show.bs.tab", {
+                    relatedTarget: e[0]
+                });
+            if (e.trigger(f), b.trigger(g), !g.isDefaultPrevented() && !f.isDefaultPrevented()) {
+                var h = a(d);
+                this.activate(b.closest("li"), c), this.activate(h, h.parent(), function() {
+                    e.trigger({
+                        type: "hidden.bs.tab",
+                        relatedTarget: b[0]
+                    }), b.trigger({
+                        type: "shown.bs.tab",
+                        relatedTarget: e[0]
+                    })
+                })
+            }
+        }
+    }, c.prototype.activate = function(b, d, e) {
+        function f() {
+            g.removeClass("active").find("> .dropdown-menu > .active").removeClass("active").end().find('[data-toggle="tab"]').attr("aria-expanded", !1), b.addClass("active").find('[data-toggle="tab"]').attr("aria-expanded", !0), h ? (b[0].offsetWidth, b.addClass("in")) : b.removeClass("fade"), b.parent(".dropdown-menu").length && b.closest("li.dropdown").addClass("active").end().find('[data-toggle="tab"]').attr("aria-expanded", !0), e && e()
+        }
+        var g = d.find("> .active"),
+            h = e && a.support.transition && (g.length && g.hasClass("fade") || !!d.find("> .fade").length);
+        g.length && h ? g.one("bsTransitionEnd", f).emulateTransitionEnd(c.TRANSITION_DURATION) : f(), g.removeClass("in")
+    };
+    var d = a.fn.tab;
+    a.fn.tab = b, a.fn.tab.Constructor = c, a.fn.tab.noConflict = function() {
+        return a.fn.tab = d, this
+    };
+    var e = function(c) {
+        c.preventDefault(), b.call(a(this), "show")
+    };
+    a(document).on("click.bs.tab.data-api", '[data-toggle="tab"]', e).on("click.bs.tab.data-api", '[data-toggle="pill"]', e)
+}(jQuery), + function(a) {
+    "use strict";
+
+    function b(b) {
+        return this.each(function() {
+            var d = a(this),
+                e = d.data("bs.affix"),
+                f = "object" == typeof b && b;
+            e || d.data("bs.affix", e = new c(this, f)), "string" == typeof b && e[b]()
+        })
+    }
+    var c = function(b, d) {
+        this.options = a.extend({}, c.DEFAULTS, d), this.$target = a(this.options.target).on("scroll.bs.affix.data-api", a.proxy(this.checkPosition, this)).on("click.bs.affix.data-api", a.proxy(this.checkPositionWithEventLoop, this)), this.$element = a(b), this.affixed = null, this.unpin = null, this.pinnedOffset = null, this.checkPosition()
+    };
+    c.VERSION = "3.3.5", c.RESET = "affix affix-top affix-bottom", c.DEFAULTS = {
+        offset: 0,
+        target: window
+    }, c.prototype.getState = function(a, b, c, d) {
+        var e = this.$target.scrollTop(),
+            f = this.$element.offset(),
+            g = this.$target.height();
+        if (null != c && "top" == this.affixed) return c > e ? "top" : !1;
+        if ("bottom" == this.affixed) return null != c ? e + this.unpin <= f.top ? !1 : "bottom" : a - d >= e + g ? !1 : "bottom";
+        var h = null == this.affixed,
+            i = h ? e : f.top,
+            j = h ? g : b;
+        return null != c && c >= e ? "top" : null != d && i + j >= a - d ? "bottom" : !1
+    }, c.prototype.getPinnedOffset = function() {
+        if (this.pinnedOffset) return this.pinnedOffset;
+        this.$element.removeClass(c.RESET).addClass("affix");
+        var a = this.$target.scrollTop(),
+            b = this.$element.offset();
+        return this.pinnedOffset = b.top - a
+    }, c.prototype.checkPositionWithEventLoop = function() {
+        setTimeout(a.proxy(this.checkPosition, this), 1)
+    }, c.prototype.checkPosition = function() {
+        if (this.$element.is(":visible")) {
+            var b = this.$element.height(),
+                d = this.options.offset,
+                e = d.top,
+                f = d.bottom,
+                g = Math.max(a(document).height(), a(document.body).height());
+            "object" != typeof d && (f = e = d), "function" == typeof e && (e = d.top(this.$element)), "function" == typeof f && (f = d.bottom(this.$element));
+            var h = this.getState(g, b, e, f);
+            if (this.affixed != h) {
+                null != this.unpin && this.$element.css("top", "");
+                var i = "affix" + (h ? "-" + h : ""),
+                    j = a.Event(i + ".bs.affix");
+                if (this.$element.trigger(j), j.isDefaultPrevented()) return;
+                this.affixed = h, this.unpin = "bottom" == h ? this.getPinnedOffset() : null, this.$element.removeClass(c.RESET).addClass(i).trigger(i.replace("affix", "affixed") + ".bs.affix")
+            }
+            "bottom" == h && this.$element.offset({
+                top: g - b - f
+            })
+        }
+    };
+    var d = a.fn.affix;
+    a.fn.affix = b, a.fn.affix.Constructor = c, a.fn.affix.noConflict = function() {
+        return a.fn.affix = d, this
+    }, a(window).on("load", function() {
+        a('[data-spy="affix"]').each(function() {
+            var c = a(this),
+                d = c.data();
+            d.offset = d.offset || {}, null != d.offsetBottom && (d.offset.bottom = d.offsetBottom), null != d.offsetTop && (d.offset.top = d.offsetTop), b.call(c, d)
+        })
+    })
+}(jQuery);
