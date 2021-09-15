@@ -10,7 +10,7 @@ html {
     -webkit-text-size-adjust: 100%;
     -ms-text-size-adjust: 100%;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-    min-width: 480px;
+    
 }
 
 body {
@@ -25,7 +25,7 @@ body {
     line-height: 1.42857143;
     color: #333;
     font-display: swap;
-    
+    min-width: 440px;
 }
 
 @font-face {
@@ -332,7 +332,7 @@ a:hover {
 
 .img-nav
 {
-    width: 250px;
+    width: 100%;
 }
 
 
@@ -501,7 +501,7 @@ p {
 }
 
 .social {
-    max-width: 400px;
+    max-width: 480px;
     margin: auto auto auto auto;
 }
 
