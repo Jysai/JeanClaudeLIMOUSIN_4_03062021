@@ -25,7 +25,7 @@ body {
     line-height: 1.42857143;
     color: #333;
     font-display: swap;
-    min-width: 440px;
+    min-width: 360px ;
 }
 
 @font-face {
@@ -644,10 +644,12 @@ h3 {
 
 .bg-banniere {
     background-image: url("img/la-chouette-agence-banniere.webp");
+    min-width: 340px ;
 }
 
 .bg-presentation {
     background-image: url("img/image-de-presentation.webp");
+    min-width: 340px ;
 }
 
 .site-navigation
