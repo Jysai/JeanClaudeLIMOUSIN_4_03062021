@@ -561,7 +561,7 @@ filter: brightness(90%);
 
 @media (max-width:600px) {
     .nav {
-        height: 115px;
+        height: 60px;
         width: 100%;
         background-color: white;
         position: relative;
@@ -580,7 +580,7 @@ filter: brightness(90%);
 
       .nav > .nav-links > a:hover {
         background-color: #F3976C;
-        text-decoration: none;
+        text-decoration: underline;
       }
 
     .nav > .nav-btn {
@@ -617,10 +617,12 @@ filter: brightness(90%);
       display: flex;
     flex-flow: column;
     text-align: center;
+    z-index: 1;
     }
     .nav > .nav-links > a {
       display: block;
       width: 100%;
+      padding: 13px;
     }
     .nav > #nav-check:not(:checked) ~ .nav-links {
       height: 0px;
